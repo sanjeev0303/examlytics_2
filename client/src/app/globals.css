@@ -1,0 +1,216 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* =========================================
+     COLOR SYSTEM (EXAMLYTICS OS)
+     ========================================= */
+
+  /* Semantic Tokens */
+  --color-bg-app: var(--bg-app);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-surface-raised: var(--bg-surface-raised);
+
+  --color-border-subtle: var(--border-subtle);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-secondary: var(--accent-secondary);
+
+  /* Functional Colors */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-critical: var(--critical);
+  --color-critical-foreground: var(--critical-foreground);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Fonts */
+  --font-heading: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* UI Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--chart-1);
+  --color-primary-foreground: #ffffff;
+  --color-muted: var(--bg-surface-raised);
+  --color-muted-foreground: var(--text-muted);
+
+  /* Theme from frontend_test */
+   --color-brand-deep: #0a0a1f;
+  --color-brand-dark: #12122b;
+  --color-brand-primary: #6366f1;
+  --color-brand-secondary: #8b5cf6;
+  --color-brand-accent: #22d3ee;
+  --color-brand-warm: #f97316;
+
+  --font-heading: var(--font-sora);
+  --font-body: var(--font-inter);
+
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
+}
+
+:root {
+
+    --background: #050511;
+  --foreground: #ffffff;
+
+  /* LIGHT MODE TOKENS */
+  --bg-app: #F9FAFB; /* Gray 50 */
+  --bg-surface: #FFFFFF;
+  --bg-surface-raised: #FFFFFF;
+
+  --border-subtle: #E5E7EB; /* Gray 200 */
+
+  --text-primary: #111827; /* Gray 900 */
+  --text-secondary: #4B5563; /* Gray 600 */
+  --text-muted: #9CA3AF; /* Gray 400 */
+
+  --accent-primary: #0F172A; /* Slate 900 */
+  --accent-secondary: #F1F5F9; /* Slate 100 */
+
+  --success: #10B981; /* Emerald 500 */
+  --success-foreground: #FFFFFF;
+
+  --warning: #F59E0B; /* Amber 500 */
+  --warning-foreground: #FFFFFF;
+
+  --critical: #EF4444; /* Red 500 */
+  --critical-foreground: #FFFFFF;
+
+  /* Chart Colors (Calm/Professional) */
+  --chart-1: #4F46E5; /* Indigo */
+  --chart-2: #10B981; /* Emerald */
+  --chart-3: #F59E0B; /* Amber */
+  --chart-4: #06B6D4; /* Cyan */
+  --chart-5: #8B5CF6; /* Violet */
+
+  /* Font Vars */
+   --font-sora: 'Sora', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+}
+
+.dark {
+  /* DARK MODE TOKENS */
+  --bg-app: #0B0E14; /* Deep Navy/Black */
+  --bg-surface: #151921; /* Panel Gray */
+  --bg-surface-raised: #1F2937; /* Lighter Panel */
+
+  --border-subtle: #1F2937; /* Gray 800 */
+
+  --text-primary: #F9FAFB; /* Gray 50 */
+  --text-secondary: #D1D5DB; /* Gray 300 */
+  --text-muted: #9CA3AF; /* Gray 400 */
+
+  --accent-primary: #F8FAFC; /* Slate 50 (Inverted) */
+  --accent-secondary: #27272A; /* Zinc 800 */
+
+  --success: #10B981; /* Emerald 500 */
+  --success-foreground: #FFFFFF;
+
+  --warning: #F59E0B; /* Amber 500 */
+  --warning-foreground: #FFFFFF;
+
+  --critical: #EF4444; /* Red 500 */
+  --critical-foreground: #FFFFFF;
+
+  /* Adjusted for Dark Mode Contrast */
+  --chart-1: #6366F1; /* Indigo 400 */
+  --chart-2: #34D399; /* Emerald 400 */
+  --chart-3: #FBBF24; /* Amber 400 */
+  --chart-4: #22D3EE; /* Cyan 400 */
+  --chart-5: #A78BFA; /* Violet 400 */
+}
+
+/* Base Resets */
+body {
+   color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* Utilities */
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility glass-panel {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(229, 231, 235, 0.5);
+
+  .dark & {
+    background-color: rgba(21, 25, 33, 0.8);
+    border: 1px solid rgba(31, 41, 55, 0.5);
+  }
+}
+
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a1f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #33334d;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4f4f7a;
+}
