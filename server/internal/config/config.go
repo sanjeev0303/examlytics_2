@@ -10,15 +10,16 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Port            int
-	Env             string
-	LogLevel        string
-	DatabaseURL     string
-	ClerkSecretKey  string
-	GeoIPDBPath     string
-	AIServiceURL    string
-	RedisURL        string
-	AIServiceSecret string
+	Port             int
+	Env              string
+	LogLevel         string
+	DatabaseURL      string
+	JWTSecret        string
+	JWTRefreshSecret string
+	GeoIPDBPath      string
+	AIServiceURL     string
+	RedisURL         string
+	AIServiceSecret  string
 
 	// Concurrency limits (admission control)
 	MaxGlobalConcurrency        int // default: 3000 (total admitted requests)
@@ -67,7 +68,8 @@ func Load() *Config {
 		Env:                         getEnv("ENV", envDefault),
 		LogLevel:                    getEnv("LOG_LEVEL", "info"),
 		DatabaseURL:                 getEnv("DATABASE_URL", ""),
-		ClerkSecretKey:              getEnv("CLERK_SECRET_KEY", ""),
+		JWTSecret:                   getEnv("JWT_SECRET", "change-me-jwt-secret-32-chars-min"),
+		JWTRefreshSecret:            getEnv("JWT_REFRESH_SECRET", "change-me-refresh-secret-32-chars"),
 		GeoIPDBPath:                 getEnv("GEOIP_DB_PATH", "./data/GeoLite2-Country.mmdb"),
 		AIServiceURL:                getEnv("AI_SERVICE_URL", "http://localhost:8001"),
 		RedisURL:                    getEnv("REDIS_URL", ""),

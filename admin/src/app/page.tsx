@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser, useAuth, UserButton } from "@clerk/nextjs";
+import { useAuth, useUser } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { OverviewChart, UserDistributionPie, AIUsageChart } from "@/components/AdminCharts";
@@ -12,7 +12,6 @@ import { AnomalyCenter } from "@/components/dashboard/anomaly-center";
 
 interface UserData {
   id: string;
-  clerkId: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -37,26 +36,7 @@ export default function AdminDashboard() {
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-      // Sync user with backend
-      const syncRes = await fetch(`${apiUrl}/auth/sync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          email: user?.primaryEmailAddress?.emailAddress,
-          firstName: user?.firstName,
-          lastName: user?.lastName,
-          imageUrl: user?.imageUrl,
-        }),
-      });
-
-      if (!syncRes.ok) {
-        throw new Error("Failed to sync user");
-      }
-
-      // Get user data with role
+      // Get user data with role from JWT-based /auth/me endpoint
       const meRes = await fetch(`${apiUrl}/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -134,7 +114,12 @@ export default function AdminDashboard() {
             You don't have admin privileges. Please contact an administrator if you believe this is an error.
           </p>
           <div className="flex justify-center">
-             <UserButton afterSignOutUrl="/sign-in" />
+            <button
+              onClick={() => router.push("/sign-in")}
+              className="px-6 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg transition-colors"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </div>

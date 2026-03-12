@@ -13,37 +13,43 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Manual Mock matching internal/service/UserService
+// Manual Mock matching internal/service/UserService (JWT-based)
 type MockUserService struct {
-	MockGetRole func(clerkID string) (*string, error)
+	MockGetRole func(userID string) (*string, error)
 }
 
-func (m *MockUserService) CreateUser(ctx context.Context, data *dto.CreateUserRequest) (*domain.User, error) {
+func (m *MockUserService) RegisterUser(ctx context.Context, req *dto.RegisterRequest) (*domain.User, error) {
+	return nil, nil
+}
+func (m *MockUserService) AuthenticateUser(ctx context.Context, req *dto.LoginRequest) (*domain.User, error) {
 	return nil, nil
 }
 func (m *MockUserService) GetUsers(ctx context.Context) ([]*domain.User, error) { return nil, nil }
-func (m *MockUserService) GetUserByClerkID(ctx context.Context, clerkID string) (*domain.User, error) {
+func (m *MockUserService) GetUserByID(ctx context.Context, userID string) (*domain.User, error) {
 	return nil, nil
 }
-func (m *MockUserService) GetUserRoleByClerkID(ctx context.Context, clerkID string) (*string, error) {
+func (m *MockUserService) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	return nil, nil
+}
+func (m *MockUserService) GetUserRoleByID(ctx context.Context, userID string) (*string, error) {
 	if m.MockGetRole != nil {
-		return m.MockGetRole(clerkID)
+		return m.MockGetRole(userID)
 	}
 	return nil, nil
 }
-func (m *MockUserService) SyncClerkUser(ctx context.Context, data *dto.CreateUserRequest) (*domain.User, error) {
-	return nil, nil
-}
-func (m *MockUserService) OnboardUser(ctx context.Context, clerkID string, req dto.OnboardingRequest) error {
+func (m *MockUserService) OnboardUser(ctx context.Context, userID string, req dto.OnboardingRequest) error {
 	return nil
 }
 func (m *MockUserService) GetAdminStats(ctx context.Context) (*dto.AdminStatsResponse, error) {
 	return nil, nil
 }
-func (m *MockUserService) GetUserWeakTopics(ctx context.Context, clerkID string) ([]*domain.UserWeakTopic, error) {
+func (m *MockUserService) GetUserWeakTopics(ctx context.Context, userID string) ([]*domain.UserWeakTopic, error) {
 	return nil, nil
 }
 func (m *MockUserService) GetUserAIContext(ctx context.Context, userID string) (*domain.UserAIContext, error) {
+	return nil, nil
+}
+func (m *MockUserService) UpdateProfile(ctx context.Context, userID string, req dto.UpdateProfileRequest) (*domain.User, error) {
 	return nil, nil
 }
 
@@ -79,24 +85,24 @@ func TestRateLimiter(t *testing.T) {
 func TestRequireLogin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	mockService := &MockUserService{}
-	cfg := &config.Config{ClerkSecretKey: "test_secret"}
-	clerkAuth := middleware.NewClerkAuth(cfg, mockService)
+	cfg := &config.Config{JWTSecret: "test_jwt_secret_32_characters_long!"}
+	jwtAuth := middleware.NewJWTAuth(cfg, mockService)
 
-	// Case 1: Unauthorized
+	// Case 1: Unauthorized (no userID in context)
 	w1 := httptest.NewRecorder()
 	c1, _ := gin.CreateTestContext(w1)
 	c1.Request = httptest.NewRequest("GET", "/protected", nil)
-	clerkAuth.RequireLogin()(c1)
+	jwtAuth.RequireLogin()(c1)
 	if w1.Code != http.StatusUnauthorized {
 		t.Errorf("Expected 401, got %d", w1.Code)
 	}
 
-	// Case 2: Authorized
+	// Case 2: Authorized (userID set in context)
 	w2 := httptest.NewRecorder()
 	c2, _ := gin.CreateTestContext(w2)
 	c2.Request = httptest.NewRequest("GET", "/protected", nil)
-	c2.Set("clerkUserID", "user_123")
-	clerkAuth.RequireLogin()(c2)
+	c2.Set("userID", "user_123")
+	jwtAuth.RequireLogin()(c2)
 	if w2.Code != http.StatusOK {
 		t.Errorf("Expected 200 (Next called), got %d", w2.Code)
 	}
@@ -104,7 +110,7 @@ func TestRequireLogin(t *testing.T) {
 
 func TestRequireAdmin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	cfg := &config.Config{ClerkSecretKey: "test_secret"}
+	cfg := &config.Config{JWTSecret: "test_jwt_secret_32_characters_long!"}
 
 	// Case 1: Not Admin
 	mockService1 := &MockUserService{
@@ -113,12 +119,12 @@ func TestRequireAdmin(t *testing.T) {
 			return &role, nil
 		},
 	}
-	clerkAuth1 := middleware.NewClerkAuth(cfg, mockService1)
+	jwtAuth1 := middleware.NewJWTAuth(cfg, mockService1)
 	w1 := httptest.NewRecorder()
 	c1, _ := gin.CreateTestContext(w1)
 	c1.Request = httptest.NewRequest("GET", "/admin", nil)
-	c1.Set("clerkUserID", "user_normal")
-	clerkAuth1.RequireAdmin()(c1)
+	c1.Set("userID", "user_normal")
+	jwtAuth1.RequireAdmin()(c1)
 	if w1.Code != http.StatusForbidden {
 		t.Errorf("Expected 403, got %d", w1.Code)
 	}
@@ -130,12 +136,12 @@ func TestRequireAdmin(t *testing.T) {
 			return &role, nil
 		},
 	}
-	clerkAuth2 := middleware.NewClerkAuth(cfg, mockService2)
+	jwtAuth2 := middleware.NewJWTAuth(cfg, mockService2)
 	w2 := httptest.NewRecorder()
 	c2, _ := gin.CreateTestContext(w2)
 	c2.Request = httptest.NewRequest("GET", "/admin", nil)
-	c2.Set("clerkUserID", "admin_user")
-	clerkAuth2.RequireAdmin()(c2)
+	c2.Set("userID", "admin_user")
+	jwtAuth2.RequireAdmin()(c2)
 	if w2.Code != http.StatusOK {
 		t.Errorf("Expected 200, got %d", w2.Code)
 	}

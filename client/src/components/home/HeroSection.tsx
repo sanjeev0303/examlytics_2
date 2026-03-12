@@ -2,7 +2,8 @@
 
 import React from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import Link from "next/link";
+import { motion } from "motion/react";
 import { ArrowRight, Play, TrendingUp, Brain, Target } from "lucide-react";
 import { AntigravityButton } from "@/components/ui/AntigravityButton";
 import { AntigravityCard } from "@/components/ui/AntigravityCard";
@@ -13,12 +14,14 @@ export const HeroSection = () => {
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
       {/* Background Particles & Grid */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-black/60 z-10" /> {/* Overlay for readability */}
+        <div className="absolute inset-0 bg-black/60 z-10" /> {/* Overlay */}
         <Image
           src="/landing_background.png"
-          alt="Antigravity Background"
+          alt=""
           fill
           priority
+          sizes="100vw"
+          quality={80}
           className="object-cover opacity-60"
         />
       </div>
@@ -59,10 +62,12 @@ export const HeroSection = () => {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start"
           >
-            <AntigravityButton size="lg" className="group">
-              Start Free Assessment
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </AntigravityButton>
+            <Link href="/onboarding">
+              <AntigravityButton size="lg" className="group">
+                Start Free Assessment
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </AntigravityButton>
+            </Link>
             <AntigravityButton variant="glass" size="lg" className="group">
               <Play className="mr-2 w-5 h-5 fill-white" />
               View Live Demo

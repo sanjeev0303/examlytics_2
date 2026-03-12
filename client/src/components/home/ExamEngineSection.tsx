@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Zap, BookOpen, Layers, Clock } from "lucide-react";
 import { SectionWrapper } from "@/components/ui/SectionWrapper";
 import { AntigravityCard } from "@/components/ui/AntigravityCard";
@@ -85,7 +85,7 @@ export const ExamEngineSection = () => {
         </div>
 
         {/* Visualizer */}
-        <div className="lg:col-span-7 relative h-[500px] flex items-center justify-center">
+        <div className="lg:col-span-7 relative h-125 flex items-center justify-center">
            {/* Floating Simulation */}
            <div className="absolute inset-0 bg-brand-primary/5 rounded-3xl blur-3xl opacity-50" />
 

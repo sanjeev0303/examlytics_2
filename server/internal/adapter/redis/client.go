@@ -179,3 +179,23 @@ func (r *RedisClient) Incr(ctx context.Context, key string) (int64, error) {
 func (r *RedisClient) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error) {
 	return r.Client.SetNX(ctx, key, value, expiration).Result()
 }
+
+// RPush appends one or more values to a list.
+func (r *RedisClient) RPush(ctx context.Context, key string, values ...interface{}) error {
+	return r.Client.RPush(ctx, key, values...).Err()
+}
+
+// LRange returns a range of elements from a list.
+func (r *RedisClient) LRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
+	return r.Client.LRange(ctx, key, start, stop).Result()
+}
+
+// LLen returns the length of a list.
+func (r *RedisClient) LLen(ctx context.Context, key string) (int64, error) {
+	return r.Client.LLen(ctx, key).Result()
+}
+
+// Expire sets a TTL on an existing key.
+func (r *RedisClient) Expire(ctx context.Context, key string, expiration time.Duration) error {
+	return r.Client.Expire(ctx, key, expiration).Err()
+}

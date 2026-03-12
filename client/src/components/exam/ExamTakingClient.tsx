@@ -7,7 +7,7 @@ import { ExamRunner } from "./ExamRunner";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ExamTakingClientProps {
   examId: string;

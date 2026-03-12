@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform } from "motion/react";
 import { SectionWrapper } from "@/components/ui/SectionWrapper";
 import { MousePointerClick, BrainCircuit, BarChart2, TrendingUp } from "lucide-react";
 
@@ -57,6 +57,9 @@ export const HowItWorksSection = () => {
                                 src={step.img}
                                 alt={step.title}
                                 fill
+                                loading="lazy"
+                                sizes="(max-width: 768px) 100vw, 40vw"
+                                quality={75}
                                 className="object-cover"
                             />
                          </div>

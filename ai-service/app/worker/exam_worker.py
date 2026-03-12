@@ -62,14 +62,23 @@ def start_worker():
     import threading
     threading.Thread(target=process_delayed_jobs, daemon=True).start()
 
+    _was_paused = None  # Track last known paused state to suppress log spam
+
     while True:
         try:
             # Check if worker is enabled via Redis flag
             worker_enabled = r.get("exam:worker:enabled")
             if worker_enabled != b"true" and worker_enabled != "true":
-                print("⏸️  Worker paused: exam:worker:enabled flag not set to 'true'")
+                if _was_paused is not True:
+                    print("⏸️  Worker paused: exam:worker:enabled flag not set to 'true'")
+                    _was_paused = True
                 time.sleep(5)
                 continue
+
+            # Log once when worker resumes from paused state
+            if _was_paused is True:
+                print("▶️  Worker resumed: exam:worker:enabled is now 'true'")
+            _was_paused = False
 
             # Blocking Pop from Main Queue
             result = r.blpop(QUEUE_NAME, timeout=5)
@@ -246,6 +255,9 @@ def process_job(job):
         session.status = "PROCESSING"
         db.commit()
 
+        # Update Redis status so client polling sees PROCESSING instead of PENDING
+        r.set(f"job:{session_id}", json.dumps({"jobId": session_id, "status": "PROCESSING"}), ex=3600)
+
         # 2. Fetch User AI Context for Adaptive Intelligence
         user_id = session.user_id
 
@@ -281,9 +293,13 @@ def process_job(job):
 
         questions_json = []
 
-        # 3. Create Questions in DB (if we want to persist them as reusable entities)
-        # OR just store them in the session if they are ephemeral custom gen.
-        # The prompt implies dynamic generation. Let's persist them for analytics but maybe mark them as generated.
+        # 3. Stream questions to Redis incrementally for instant frontend access
+        stream_key = f"stream:{session_id}"
+        total_key = f"stream:{session_id}:total"
+        num_questions = len(questions_data)
+
+        # Set expected total so frontend knows how many to wait for
+        r.set(total_key, str(num_questions), ex=3600)
 
         for i, q_data in enumerate(questions_data):
             # Create Question Record
@@ -292,10 +308,7 @@ def process_job(job):
             if options_raw is None:
                 options_raw = []
 
-            # (Optional) We skip saving individual Question models to DB for speed in this refactor,
-            # assuming we just store JSON in session. Or keep existing logic if robust.
-            # Keeping simplistic logic for constraints:
-            questions_json.append({
+            q_json = {
                 "id": str(uuid.uuid4()),
                 "text": q_data.get("question") or q_data.get("problem_statement"),
                 "options": options_raw,
@@ -303,7 +316,25 @@ def process_job(job):
                 "correct_answer": q_data.get("correct_answer"),
                 "difficulty": q_data.get("difficulty", "Medium"),
                 "explanation": q_data.get("explanation")
-            })
+            }
+
+            questions_json.append(q_json)
+
+            # Push each question to Redis list immediately
+            r.rpush(stream_key, json.dumps(q_json))
+
+            # After first 1-2 questions, update status to STREAMING so frontend redirects
+            if i == 0:
+                r.set(f"job:{session_id}", json.dumps({
+                    "jobId": session_id,
+                    "status": "STREAMING",
+                    "sessionId": session_id
+                }), ex=3600)
+                print(f"🚀 First question streamed for {session_id} — status: STREAMING")
+
+        # Set TTL on stream keys (1 hour)
+        r.expire(stream_key, 3600)
+        r.expire(total_key, 3600)
 
         # 4. Update Session to READY
         session.questions = questions_json
@@ -333,6 +364,13 @@ def process_job(job):
 
         if is_exhaustion and retry_count < 3:
             print(f"🔄 Moving job {session_id} to DELAYED queue (Attempt {retry_count+1}/3)")
+
+            # Update Redis status so client sees FAILED instead of stuck PENDING
+            r.set(f"job:{session_id}", json.dumps({
+                "jobId": session_id,
+                "status": "FAILED",
+                "error": f"Generation failed (attempt {retry_count+1}/3, retrying in 10min): {str(e)[:150]}"
+            }), ex=3600)
 
             # Requirement 5: "retry timestamp (now + 10 minutes)"
             delay = 600 # 10 minutes
@@ -401,6 +439,11 @@ def perform_hard_fallback(session_id, preferences, db, original_error):
 
     except Exception as fallback_err:
         print(f"❌ CRITICAL: Hard Fallback Failed: {fallback_err}")
-        # Last resort: Mark failed
+        # Last resort: Mark failed in both DB and Redis
         session.status = "FAILED"
         db.commit()
+        r.set(f"job:{session_id}", json.dumps({
+            "jobId": session_id,
+            "status": "FAILED",
+            "error": f"All generation attempts failed: {str(fallback_err)[:150]}"
+        }), ex=3600)

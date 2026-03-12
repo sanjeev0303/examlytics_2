@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
+import { AuthProvider } from "@/contexts/AuthContext";
 import QueryProvider from "@/providers/QueryProvider";
 import "./globals.css";
 
@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <AuthProvider>
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#09090b] text-white`}
@@ -48,6 +48,6 @@ export default function RootLayout({
           </QueryProvider>
         </body>
       </html>
-    </ClerkProvider>
+    </AuthProvider>
   );
 }

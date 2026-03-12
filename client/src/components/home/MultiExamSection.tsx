@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { SectionWrapper } from "@/components/ui/SectionWrapper";
 import { AntigravityCard } from "@/components/ui/AntigravityCard";
 import { Globe, GraduationCap, Briefcase } from "lucide-react";
@@ -30,7 +30,7 @@ export const MultiExamSection = () => {
         </p>
       </div>
 
-      <div className="relative h-[600px] w-full flex items-center justify-center perspective-1000">
+      <div className="relative h-150 w-full flex items-center justify-center perspective-1000">
          {/* Central Core */}
          <div className="absolute z-10 w-48 h-48 bg-white/5 rounded-full backdrop-blur-md border border-white/10 flex items-center justify-center shadow-[0_0_50px_rgba(255,255,255,0.1)]">
             <Globe className="w-20 h-20 text-white/20" />

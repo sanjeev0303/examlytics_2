@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "skills": {
+    "3d-web-experience": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "9081911c0c5fda9731d2106a31113c976c4e62e73ab852b4564346295b35f235"
+    },
+    "ai-prompt-engineering": {
+      "source": "vasilyu1983/ai-agents-public",
+      "sourceType": "github",
+      "computedHash": "39f9939e80bacab2d9f2206ffb95e974cee4ff9c0194caa5c0b7f391d5cd0338"
+    },
+    "fastapi-expert": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "1cf755bb184def33f9aff86940c10a6f1ffbea56ed05d41f35ce4ab4dbe08ed7"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+    },
+    "golang-best-practices": {
+      "source": "difyz9/golang-best-practices",
+      "sourceType": "github",
+      "computedHash": "9b18ff09b20a34a74ed851f81a9d7d7e088674e2021379b185553ef51e2c2b4c"
+    },
+    "golang-concurrency-patterns": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "a0d711d477d0e4448da73db522b452cadacb147b646b44b0ea066e43f8fd4b2a"
+    },
+    "golang-pro": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "c90a0798a12ea2d9191508439ec3191dd96713310615260ebe82ec5a09a4a434"
+    },
+    "mobile-responsiveness": {
+      "source": "hoodini/ai-agents-skills",
+      "sourceType": "github",
+      "computedHash": "d40ffbede786927da70723ebd4bfd332505d04f495e7e75ab4b6651a13006a62"
+    },
+    "modern-frontend-design": {
+      "source": "deveshpunjabi/modern-frontend-skill",
+      "sourceType": "github",
+      "computedHash": "9e673d3ad89fe557347daabaea034e7df2df026dbc328becbadb66d24408abe9"
+    },
+    "react-best-practices": {
+      "source": "0xbigboss/claude-code",
+      "sourceType": "github",
+      "computedHash": "aa9b223c6803bc5d1aaa6829efe33e17de1f69927abf00819d0fd2b9e319ff4f"
+    },
+    "senior-backend": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "computedHash": "1919d688687239bae5880bd935ce8f845e7b4f82293faba882bb8e2cbb9481b6"
+    },
+    "senior-ml-engineer": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "computedHash": "ffbb008afe56a957fbe981b2bff7c1860013acc67910e8763ab261e4f0f5adb8"
+    },
+    "simple": {
+      "source": "roin-orca/skills",
+      "sourceType": "github",
+      "computedHash": "cfde9dde00c9b1f8934e0312440a5ae2ed76dbd81e49ba7433e0e63ea6551d13"
+    },
+    "spline-3d-integration": {
+      "source": "fawaz-i/spline-3d-integration",
+      "sourceType": "github",
+      "computedHash": "265946945d7de7403c19b9cb206e231b708f72e153cad6ce2fa5320c64edb4db"
+    },
+    "threejs-3d-graphics": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "computedHash": "3ff01b0e46925f84d0d2a709f945c8205d30178dc87cac66bb6c26946b41d7e3"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "computedHash": "0a413bf988d06481f69bb81df2070741c3ba12dd9f1be2706d57f259c905992d"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "3462ec83f862abb2d532953df33a4dbf87f4616849da5d4b5cc7c13601aaf997"
+    }
+  }
+}

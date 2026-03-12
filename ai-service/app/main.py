@@ -103,6 +103,7 @@ import asyncio
 from app.events.subscriber import listen_to_redis
 
 background_tasks = set()
+_worker_started = False  # Guard: only start worker thread once per process
 
 @app.on_event("startup")
 async def startup_event():
@@ -134,11 +135,29 @@ async def startup_event():
     from app.core.cache import redis_cache
     await redis_cache.connect()
 
-    # 5. Start Exam Worker (in thread or separate process ideally, but thread works for I/O bound)
-    import threading
-    from app.worker.exam_worker import start_worker
-    worker_thread = threading.Thread(target=start_worker, daemon=True)
-    worker_thread.start()
+    # 5. Auto-enable the exam worker via Redis flag if configured
+    import redis as _redis
+    _r = _redis.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+    if os.getenv("EXAM_WORKER_ENABLED", "false").lower() == "true":
+        _r.set("exam:worker:enabled", "true")
+        logger.info("✅ exam:worker:enabled flag set to true (EXAM_WORKER_ENABLED=true)")
+    else:
+        # Only set to false if the key doesn't already exist (don't override manual admin control)
+        if not _r.exists("exam:worker:enabled"):
+            _r.set("exam:worker:enabled", "false")
+            logger.info("⏸️  exam:worker:enabled flag initialized to false")
+
+    # 6. Start Exam Worker thread — guarded so hot-reload doesn't stack multiple threads
+    global _worker_started
+    if not _worker_started:
+        import threading
+        from app.worker.exam_worker import start_worker
+        worker_thread = threading.Thread(target=start_worker, daemon=True)
+        worker_thread.start()
+        _worker_started = True
+        logger.info("👷 Exam worker thread started")
+    else:
+        logger.info("👷 Exam worker thread already running, skipping duplicate start")
 
     logger.info("🎉 AI Service ready to accept requests")
 

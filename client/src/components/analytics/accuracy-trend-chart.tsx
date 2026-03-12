@@ -37,7 +37,7 @@ export function AccuracyTrendChart({ data, className }: AccuracyTrendChartProps)
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full">
+        <div className="h-75 w-full">
             <ChartContainer config={config} className="h-full w-full">
                 <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>

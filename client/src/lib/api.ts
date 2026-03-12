@@ -9,6 +9,7 @@ export const api = {
   startExam: ExamService.start,
   submitExam: ExamService.submit,
   getExamSession: ExamService.getSession,
+  getStreamingQuestions: ExamService.getStreamingQuestions,
   getExamHistory: ExamService.getHistory,
   getExamStatus: ExamService.getExamStatus,
 

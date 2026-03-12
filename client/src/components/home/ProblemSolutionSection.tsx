@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { XCircle, CheckCircle, BarChart3, Search, Lightbulb, Target, TrendingUp, ArrowRight } from "lucide-react";
 import { SectionWrapper } from "@/components/ui/SectionWrapper";
 import { AntigravityCard } from "@/components/ui/AntigravityCard";
@@ -26,7 +26,7 @@ export const ProblemSolutionSection = () => {
               </p>
            </motion.div>
 
-           <div className="relative h-[400px]">
+           <div className="relative h-100">
               <AntigravityCard className="absolute top-0 left-0 w-64 bg-red-500/5 border-red-500/20 -rotate-6 z-10">
                  <XCircle className="w-8 h-8 text-red-400 mb-2" />
                  <h3 className="font-bold text-red-200">Random Practice</h3>
@@ -49,7 +49,7 @@ export const ProblemSolutionSection = () => {
 
         {/* Right: The Solution (Order & Data) */}
         <div className="relative">
-           <div className="absolute left-[-40px] top-1/2 -translate-y-1/2 hidden lg:flex flex-col items-center gap-2 z-40">
+           <div className="absolute -left-10 top-1/2 -translate-y-1/2 hidden lg:flex flex-col items-center gap-2 z-40">
              <div className="h-20 w-px bg-linear-to-b from-transparent to-brand-primary" />
              <div className="w-8 h-8 rounded-full bg-brand-primary/20 flex items-center justify-center border border-brand-primary/50 text-brand-primary shadow-[0_0_20px_rgba(99,102,241,0.5)]">
                <ArrowRight className="w-4 h-4" />

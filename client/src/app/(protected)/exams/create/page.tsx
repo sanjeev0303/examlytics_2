@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { motion } from "motion/react";
+import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -113,16 +114,23 @@ export default function CreateExamPage() {
               headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (statusRes.status === "READY") {
+            if (statusRes.status === "READY" || statusRes.status === "COMPLETED") {
               clearInterval(pollInterval);
               toast.success("Exam ready! Redirecting...");
-              // Navigate to exam session
-              router.push(`/exam/${jobId}`);
+              // Navigate to exam session — use sessionId if available, fallback to jobId
+              const targetId = statusRes.sessionId || jobId;
+              router.push(`/exam/${targetId}`);
+            } else if (statusRes.status === "STREAMING") {
+              clearInterval(pollInterval);
+              toast.success("Questions streaming! Redirecting...");
+              const targetId = statusRes.sessionId || jobId;
+              router.push(`/exam/${targetId}`);
             } else if (statusRes.status === "FAILED") {
               clearInterval(pollInterval);
-              toast.error("Exam generation failed");
+              toast.error(statusRes.error || "Exam generation failed");
               setLoading(false);
             } else {
+              // PENDING or PROCESSING
               toast.info(`Generating exam... (${statusRes.status})`);
             }
           } catch (pollError) {
@@ -146,14 +154,39 @@ export default function CreateExamPage() {
     } catch (error) {
       console.error(error);
       toast.error("Something went wrong");
-    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container max-w-4xl py-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8 text-center">
+    <div className="min-h-full w-full h-screen relative">
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-zinc-50 dark:bg-zinc-950/80 mask-[radial-gradient(ellipse_at_center,transparent_20%,black)]">
+        <svg
+          className="absolute inset-0 h-full w-full stroke-zinc-400/30 dark:stroke-zinc-600/20"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern id="exams-create-grid" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="translate(0,0)">
+              <path d="M0 40V.5H40" fill="none" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#exams-create-grid)" />
+        </svg>
+      </div>
+
+      <motion.div
+        animate={{ x: [0, 20, 0], y: [0, -30, 0], scale: [1, 1.1, 1] }}
+        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+        className="absolute top-1/4 left-10 h-100 w-100 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/20 blur-[120px] dark:bg-violet-600/20"
+      />
+      <motion.div
+        animate={{ x: [0, -20, 0], y: [0, 40, 0], scale: [1, 1.2, 1] }}
+        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+        className="absolute bottom-1/4 right-10 h-100 w-100 translate-x-1/3 translate-y-1/3 rounded-full bg-fuchsia-500/20 blur-[120px] dark:bg-fuchsia-600/20"
+      />
+
+      <div className="container relative z-10 max-w-6xl mx-auto py-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold tracking-tight">Construct Your Challenge</h1>
         <p className="text-muted-foreground mt-2">Customize every aspect of your exam to fit your learning goals.</p>
       </div>
@@ -170,8 +203,8 @@ export default function CreateExamPage() {
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
              {/* Left Column: Core Configuration */}
-             <div className="md:col-span-2 space-y-6">
-                <Card>
+             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="md:col-span-2 space-y-6">
+                <Card className="bg-card/50 backdrop-blur-xl border-white/10 shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-primary" />
@@ -184,9 +217,9 @@ export default function CreateExamPage() {
                     {/* Dynamic Fields based on Type */}
                     {examType === "CODING" && (
                          <div className="space-y-2">
-                           <Label>Programming Language</Label>
+                           <Label className="text-sm font-medium text-muted-foreground">Programming Language</Label>
                            <Select value={language} onValueChange={setLanguage}>
-                             <SelectTrigger>
+                             <SelectTrigger className="h-11 bg-muted/30 border-border/50 hover:bg-muted/50">
                                <SelectValue placeholder="Select Language" />
                              </SelectTrigger>
                              <SelectContent>
@@ -200,9 +233,9 @@ export default function CreateExamPage() {
 
                     {examType === "JOB" && (
                          <div className="space-y-2">
-                           <Label>Target Role</Label>
+                           <Label className="text-sm font-medium text-muted-foreground">Target Role</Label>
                            <Select value={jobCategory} onValueChange={setJobCategory}>
-                             <SelectTrigger>
+                             <SelectTrigger className="h-11 bg-muted/30 border-border/50 hover:bg-muted/50">
                                <SelectValue placeholder="Select Role" />
                              </SelectTrigger>
                              <SelectContent>
@@ -245,7 +278,7 @@ export default function CreateExamPage() {
 
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2">
-                             <Label>Difficulty</Label>
+                             <Label className="text-sm font-medium text-muted-foreground">Difficulty</Label>
                              <RadioGroup value={difficulty} onValueChange={setDifficulty} className="flex flex-col space-y-1">
                                 <div className="flex items-center space-x-2">
                                   <RadioGroupItem value="EASY" id="easy" />
@@ -263,9 +296,9 @@ export default function CreateExamPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Mode</Label>
+                            <Label className="text-sm font-medium text-muted-foreground">Mode</Label>
                             <Select value={mode} onValueChange={setMode}>
-                                <SelectTrigger>
+                                <SelectTrigger className="h-11 bg-muted/30 border-border/50 hover:bg-muted/50">
                                 <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -279,11 +312,11 @@ export default function CreateExamPage() {
 
                   </CardContent>
                 </Card>
-             </div>
+             </motion.div>
 
-             {/* Right Column: Summary & Actions */}
-             <div className="space-y-6">
-                <Card>
+             {/* Right Column: Details & Submit */}
+             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="space-y-6">
+                <Card className="bg-card/50 backdrop-blur-xl border-white/10 shadow-xl">
                   <CardHeader>
                     <CardTitle>Exam Details</CardTitle>
                   </CardHeader>
@@ -336,9 +369,10 @@ export default function CreateExamPage() {
                      </Button>
                   </CardContent>
                 </Card>
-             </div>
+             </motion.div>
           </div>
         </Tabs>
+      </div>
       </div>
     </div>
   );

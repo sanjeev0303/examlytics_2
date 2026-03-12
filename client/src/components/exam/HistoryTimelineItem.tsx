@@ -8,10 +8,33 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle2, AlertCircle, Play, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { motion } from 'motion/react';
 
 interface HistoryTimelineItemProps {
   session: any;
   isLast?: boolean;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  JEE:         "JEE Practice",
+  JOB:         "Job Preparation",
+  CODING:      "Coding Challenge",
+  CUSTOM:      "Custom Assessment",
+  IMPROVEMENT: "Improvement Exam",
+};
+
+const GENERIC_SENTINELS = new Set(["general", "default", "none", "n/a"]);
+
+function resolveTitle(session: any): string {
+  const topicName: string = session.topicName ?? "";
+  const topicId: string   = session.topicId   ?? "";
+  const type: string      = (session.type ?? "").toUpperCase();
+
+  if (topicName && !GENERIC_SENTINELS.has(topicName.toLowerCase())) return topicName;
+  if (topicId   && !GENERIC_SENTINELS.has(topicId.toLowerCase()))   return topicId;
+  if (type && TYPE_LABELS[type]) return TYPE_LABELS[type];
+  if (type) return `${type.charAt(0) + type.slice(1).toLowerCase()} Assessment`;
+  return "Assessment";
 }
 
 export const HistoryTimelineItem = memo(({ session, isLast }: HistoryTimelineItemProps) => {
@@ -30,7 +53,7 @@ export const HistoryTimelineItem = memo(({ session, isLast }: HistoryTimelineIte
     <div className="relative pl-8 pb-8">
         {/* Timeline Line */}
         {!isLast && (
-             <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border/50" />
+             <div className="absolute left-2.75 top-6 bottom-0 w-px bg-border/50" />
         )}
 
         {/* Timeline Dot */}
@@ -47,10 +70,10 @@ export const HistoryTimelineItem = memo(({ session, isLast }: HistoryTimelineIte
             )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-card hover:bg-accent/5 p-4 rounded-xl border border-border/40 shadow-sm transition-all group">
+        <motion.div whileHover={{ y: -2, x: 2 }} className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-card hover:bg-accent/5 p-4 rounded-xl border border-border/40 shadow-sm transition-all group relative z-10 overflow-hidden before:absolute before:inset-0 before:bg-linear-to-r before:from-indigo-500/5 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:pointer-events-none">
 
             {/* Time & Title */}
-            <div className="flex-1 min-w-[120px]">
+            <div className="flex-1 min-w-30">
                 <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-mono text-muted-foreground">
                         {format(new Date(session.startedAt), "h:mm a")}
@@ -63,7 +86,7 @@ export const HistoryTimelineItem = memo(({ session, isLast }: HistoryTimelineIte
                     </Badge>
                 </div>
                 <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {session.topicName || "General Assessment"}
+                    {resolveTitle(session)}
                 </h3>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                     <span className="flex items-center gap-1">
@@ -124,7 +147,7 @@ export const HistoryTimelineItem = memo(({ session, isLast }: HistoryTimelineIte
                     )}
                 </Button>
             </div>
-        </div>
+        </motion.div>
     </div>
   );
 });

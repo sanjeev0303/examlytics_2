@@ -1,9 +1,11 @@
 "use client";
+import { motion } from 'motion/react';
+import { Target3D } from '@/components/ui/3d-icons';
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@/hooks/useAuth";
 import { Target, ArrowRight, AlertTriangle, TrendingUp, CheckCircle2, Zap } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,9 +33,13 @@ export default function WeakTopicsPage() {
 
   if (isLoading) {
       return (
-          <div className="space-y-8 animate-fade-in-up">
+         <div className="min-h-full w-full h-screen bg-zinc-50 pb-20 dark:bg-black relative overflow-hidden pt-8 sm:pt-12">
+          <div className="space-y-8 animate-fade-in-up relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div>
-                  <h1 className="text-3xl font-bold font-heading text-text-primary">Weak Topics</h1>
+                    <div className="flex items-center gap-3">
+                      <Target3D className="w-8 h-8" isActive={true} />
+                      <h1 className="text-3xl font-bold font-heading text-text-primary">Weak Topics</h1>
+                    </div>
                   <p className="text-text-secondary mt-2">AI-driven insights to help you improve faster.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -42,6 +48,7 @@ export default function WeakTopicsPage() {
                   ))}
               </div>
           </div>
+         </div>
       )
   }
 
@@ -56,12 +63,70 @@ export default function WeakTopicsPage() {
   })).sort((a: any, b: any) => b.roi - a.roi); // High ROI first
 
   return (
-    <div className="space-y-8 animate-fade-in-up pb-12">
+    <div className="min-h-full h-screen w-full bg-zinc-50 pb-20 dark:bg-black relative overflow-hidden pt-8 sm:pt-12">
+      {/* Dynamic Animated Background Elements */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <svg
+          className="absolute left-0 top-0 h-full w-full opacity-30 dark:opacity-20"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern
+              id="weak-topics-grid"
+              width="60"
+              height="60"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M 60 0 L 0 0 0 60"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                className="text-zinc-200 dark:text-zinc-800"
+              />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#weak-topics-grid)" />
+        </svg>
+
+        <motion.div
+           animate={{
+            scale: [1, 1.1, 1],
+            x: [0, 30, 0],
+            y: [0, -30, 0],
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-rose-500/20 blur-[100px] dark:bg-rose-600/20"
+        />
+        <motion.div
+           animate={{
+            scale: [1, 1.2, 1],
+            x: [0, -40, 0],
+            y: [0, 40, 0],
+          }}
+          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute top-1/2 right-0 h-100 w-100 -translate-y-1/2 translate-x-1/3 rounded-full bg-amber-500/20 blur-[120px] dark:bg-amber-600/20"
+        />
+        <motion.div
+           animate={{
+            scale: [1, 1.15, 1],
+            x: [0, 20, 0],
+            y: [0, 50, 0],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+          className="absolute -bottom-40 left-1/3 h-80 w-80 rounded-full bg-orange-500/20 blur-[100px] dark:bg-orange-600/20"
+        />
+      </div>
+
+    <div className="relative z-10 space-y-8 animate-fade-in-up pb-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
       {/* Header Area */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-            <h1 className="text-3xl font-bold font-heading text-text-primary">Targeted Improvement</h1>
+            <div className="flex items-center gap-3">
+              <Target3D className="w-8 h-8" isActive={true} />
+              <h1 className="text-3xl font-bold font-heading text-text-primary">Targeted Improvement</h1>
+            </div>
             <p className="text-text-secondary mt-2 max-w-2xl">
                 Focusing on these high-ROI topics is the fastest way to improve your overall score.
             </p>
@@ -80,10 +145,13 @@ export default function WeakTopicsPage() {
                 const isWarning = topic.severity === "warning";
 
                 return (
-                    <Card
+                    <motion.div
+                        whileHover={{ y: -4 }}
                         key={`${topic.topicName}-${i}`}
+                    >
+                    <Card
                         variant={isCritical ? "raised" : "default"}
-                        className={`group cursor-pointer hover:border-accent-primary/20 transition-all duration-300 ${isCritical ? 'border-l-4 border-l-critical dark:border-l-critical' : ''}`}
+                        className={`h-full group cursor-pointer hover:border-accent-primary/20 transition-all duration-300 ${isCritical ? 'border-l-4 border-l-critical dark:border-l-critical' : ''}`}
                     >
                         <CardHeader className="pb-3">
                             <div className="flex justify-between items-start mb-2">
@@ -128,6 +196,7 @@ export default function WeakTopicsPage() {
                             </Button>
                         </CardFooter>
                     </Card>
+                    </motion.div>
                 );
             })}
         </div>
@@ -145,6 +214,7 @@ export default function WeakTopicsPage() {
             </Button>
         </div>
       )}
+    </div>
     </div>
   );
 }

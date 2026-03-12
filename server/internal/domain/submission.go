@@ -35,17 +35,17 @@ type ExamSession struct {
 	Status         SessionStatus `json:"status" gorm:"type:varchar(20);default:'LIVE';index"`
 	StartedAt      time.Time     `json:"startedAt" gorm:"index"`
 	CompletedAt    *time.Time    `json:"completedAt"`
-	Recommendation string     `json:"recommendation"`
-	WeakTopics     []byte     `json:"weakTopics" gorm:"type:jsonb"` // Stores []dto.WeakTopic
+	Recommendation string        `json:"recommendation"`
+	WeakTopics     []byte        `json:"weakTopics" gorm:"type:jsonb"` // Stores []dto.WeakTopic
 
 	// AI Service Integration
-	Questions      []byte  `json:"questions" gorm:"type:jsonb"`      // Generated questions
-	UserResponses  []byte  `json:"userResponses" gorm:"type:jsonb"`  // User answers
-	CacheHash      *string `json:"cacheHash" gorm:"index"`           // Deduplication hash
-	CachedAnalysis []byte     `json:"cachedAnalysis" gorm:"type:jsonb"` // Cached AI result
-	JobError       *string    `json:"jobError"`                         // Error from AI worker
-	CreatedAt      time.Time  `json:"createdAt"`
-	UpdatedAt      time.Time  `json:"updatedAt"`
+	Questions      []byte    `json:"questions" gorm:"type:jsonb"`      // Generated questions
+	UserResponses  []byte    `json:"userResponses" gorm:"type:jsonb"`  // User answers
+	CacheHash      *string   `json:"cacheHash" gorm:"index"`           // Deduplication hash
+	CachedAnalysis []byte    `json:"cachedAnalysis" gorm:"type:jsonb"` // Cached AI result
+	JobError       *string   `json:"jobError"`                         // Error from AI worker
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 func (ExamSession) TableName() string {
@@ -55,6 +55,24 @@ func (ExamSession) TableName() string {
 func (es *ExamSession) BeforeCreate(tx *gorm.DB) error {
 	if es.ID == "" {
 		es.ID = uuid.New().String()
+	}
+	return nil
+}
+
+// BeforeSave sanitizes JSONB fields so empty byte slices become nil (SQL NULL)
+// instead of empty strings (”) which PostgreSQL rejects as invalid JSON.
+func (es *ExamSession) BeforeSave(tx *gorm.DB) error {
+	if len(es.CachedAnalysis) == 0 {
+		es.CachedAnalysis = nil
+	}
+	if len(es.WeakTopics) == 0 {
+		es.WeakTopics = nil
+	}
+	if len(es.UserResponses) == 0 {
+		es.UserResponses = nil
+	}
+	if len(es.Questions) == 0 {
+		es.Questions = nil
 	}
 	return nil
 }

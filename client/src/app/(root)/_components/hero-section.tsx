@@ -1,7 +1,7 @@
 "use client"
 
 import { Play } from "lucide-react"
-import { useUser } from "@clerk/nextjs"
+import { useUser } from "@/hooks/useAuth"
 import Link from "next/link"
 
 export default function HeroSection() {

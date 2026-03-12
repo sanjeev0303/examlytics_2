@@ -27,17 +27,9 @@ func NewExamWorker(redisClient *redis.RedisClient, examService service.ExamServi
 }
 
 func (w *ExamWorker) Start() {
-	go func() {
-		logger.Info("Starting Exam Worker...")
-		for {
-			select {
-			case <-w.stop:
-				return
-			default:
-				w.processNextJob()
-			}
-		}
-	}()
+	// NOTE: Exam generation (queue:exam_generation) is handled by the Python AI worker
+	// which has LLM integration for dynamic question generation.
+	// The Go worker only handles exam submission processing.
 
 	// Start Submission Worker
 	go func() {
@@ -57,55 +49,6 @@ func (w *ExamWorker) Stop() {
 	close(w.stop)
 }
 
-func (w *ExamWorker) processNextJob() {
-	// Blocking pop with 5 second timeout
-	ctx := context.Background()
-	val, err := w.redisClient.Dequeue(ctx, "queue:exam_generation", 5*time.Second)
-	if err != nil {
-		// Timeout or error, just continue
-		if err.Error() != "redis: nil" {
-			// Log typically if it's not just a timeout
-		}
-		return
-	}
-
-	var job dto.ExamGenerationJob
-	if err := json.Unmarshal([]byte(val), &job); err != nil {
-		logger.Error(err, "Failed to unmarshal job")
-		return
-	}
-
-	w.updateStatus(ctx, job.JobID, dto.JobStatusProcessing, "", "")
-
-	logger.Infof("Processing Exam Job: %s for User: %s", job.JobID, job.ClerkID)
-
-	// Call strict internal generation logic
-	// We need to verify if we can access the creation logic.
-	// Since we are inside the same package structure (but different package), we need a public method on Service
-	// that performs the logic but doesn't push to Redis.
-	// We will assume `GenerateExamSync` exists on the interface or implementation.
-	// For now, we cast to implementation or add to interface.
-	// Let's add `GenerateExamSync` to the interface later.
-
-	session, err := w.examService.GenerateExamSync(ctx, job.ClerkID, job.Request)
-	if err != nil {
-		if err.Error() == "user not found" {
-			// Silently ignore jobs for deleted users
-			logger.Warnf("Skipping job %s for missing user %s", job.JobID, job.ClerkID)
-			w.updateStatus(ctx, job.JobID, dto.JobStatusFailed, "", "user not found")
-			return
-		}
-		logger.Error(err, fmt.Sprintf("Job %s Failed", job.JobID))
-		w.updateStatus(ctx, job.JobID, dto.JobStatusFailed, "", err.Error())
-		return
-	}
-
-	logger.Infof("Job %s Completed. Session: %s", job.JobID, session.ID)
-	w.updateStatus(ctx, job.JobID, dto.JobStatusCompleted, session.ID, "")
-	logger.Infof("Job %s Completed. Session: %s", job.JobID, session.ID)
-	w.updateStatus(ctx, job.JobID, dto.JobStatusCompleted, session.ID, "")
-}
-
 func (w *ExamWorker) processNextSubmissionJob() {
 	ctx := context.Background()
 	val, err := w.redisClient.Dequeue(ctx, "queue:exam_submission", 5*time.Second)
@@ -122,7 +65,7 @@ func (w *ExamWorker) processNextSubmissionJob() {
 	w.updateStatus(ctx, job.JobID, dto.JobStatusProcessing, "", "")
 	logger.Infof("Processing Submission Job: %s", job.JobID)
 
-	result, err := w.examService.SubmitExamSync(ctx, job.ClerkID, job.Request)
+	result, err := w.examService.SubmitExamSync(ctx, job.UserID, job.Request)
 	if err != nil {
 		logger.Error(err, fmt.Sprintf("Submission Job %s Failed", job.JobID))
 		w.updateStatus(ctx, job.JobID, dto.JobStatusFailed, "", err.Error())

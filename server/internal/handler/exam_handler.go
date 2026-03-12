@@ -23,7 +23,7 @@ func NewExamHandler(examService service.ExamService) *ExamHandler {
 // GetExams handles GET /exams
 func (h *ExamHandler) GetExams(c *gin.Context) {
 	var userID string
-	if val, exists := c.Get("clerkUserID"); exists {
+	if val, exists := c.Get("userID"); exists {
 		userID = val.(string)
 	}
 
@@ -85,13 +85,13 @@ func (h *ExamHandler) StartExam(c *gin.Context) {
 		return
 	}
 
-	clerkID, exists := c.Get("clerkUserID")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Unauthorized"})
 		return
 	}
 
-	session, err := h.examService.StartExam(c.Request.Context(), clerkID.(string), req)
+	session, err := h.examService.StartExam(c.Request.Context(), userID.(string), req)
 	if err != nil {
 		logger.Error(err, "Error starting exam")
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
@@ -134,13 +134,13 @@ func (h *ExamHandler) SubmitExam(c *gin.Context) {
 		return
 	}
 
-	clerkID, exists := c.Get("clerkUserID")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Unauthorized"})
 		return
 	}
 
-	status, err := h.examService.SubmitExam(c.Request.Context(), clerkID.(string), req)
+	status, err := h.examService.SubmitExam(c.Request.Context(), userID.(string), req)
 	if err != nil {
 		logger.Error(err, "Error submitting exam")
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
@@ -152,13 +152,13 @@ func (h *ExamHandler) SubmitExam(c *gin.Context) {
 
 // GetExamHistory handles GET /exams/history
 func (h *ExamHandler) GetExamHistory(c *gin.Context) {
-	clerkID, exists := c.Get("clerkUserID")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Unauthorized"})
 		return
 	}
 
-	sessions, err := h.examService.GetUserExamHistory(c.Request.Context(), clerkID.(string))
+	sessions, err := h.examService.GetUserExamHistory(c.Request.Context(), userID.(string))
 	if err != nil {
 		logger.Error(err, "Error fetching exam history")
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Internal Server Error"})
@@ -170,13 +170,13 @@ func (h *ExamHandler) GetExamHistory(c *gin.Context) {
 
 // GetWeakTopics handles GET /exams/weak-topics
 func (h *ExamHandler) GetWeakTopics(c *gin.Context) {
-	clerkID, exists := c.Get("clerkUserID")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Unauthorized"})
 		return
 	}
 
-	weakTopics, err := h.examService.GetWeakTopics(c.Request.Context(), clerkID.(string))
+	weakTopics, err := h.examService.GetWeakTopics(c.Request.Context(), userID.(string))
 	if err != nil {
 		logger.Error(err, "Error fetching weak topics")
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Internal Server Error"})
@@ -184,4 +184,23 @@ func (h *ExamHandler) GetWeakTopics(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, weakTopics)
+}
+
+// GetStreamingQuestions handles GET /exams/session/:id/stream
+// Returns questions available so far for a streaming session
+func (h *ExamHandler) GetStreamingQuestions(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Session ID required"})
+		return
+	}
+
+	resp, err := h.examService.GetStreamingQuestions(c.Request.Context(), id)
+	if err != nil {
+		logger.Error(err, "Error fetching streaming questions")
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

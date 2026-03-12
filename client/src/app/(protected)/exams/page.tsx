@@ -1,4 +1,6 @@
 "use client";
+import { motion } from 'motion/react';
+import { Book3D } from '@/components/ui/3d-icons';
 
 import { useMemo } from "react";
 import { Search, Loader2, PlusCircle, Trophy } from "lucide-react";
@@ -7,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@/hooks/useAuth";
 import { useState, useDeferredValue } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -37,7 +39,6 @@ export default function ExamsPage() {
         const token = await getToken();
         if (!token) return [];
         const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-        if (user?.id) headers["X-Clerk-User-ID"] = user.id;
         return api.getExamHistory({ headers });
     },
     enabled: !!user?.id,
@@ -102,8 +103,10 @@ export default function ExamsPage() {
 
   if (isLoading) {
       return (
-          <div className="flex h-[60vh] items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="min-h-full w-full bg-zinc-50 pb-20 dark:bg-black relative overflow-hidden pt-8 sm:pt-12">
+            <div className="flex h-[60vh] items-center justify-center relative z-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
           </div>
       );
   }
@@ -112,11 +115,69 @@ export default function ExamsPage() {
   const hasResults = attempted.length > 0 || Object.values(categories).some(list => list.length > 0);
 
   return (
-    <div className="space-y-10 animate-fade-in-up pb-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full w-full h-screen bg-zinc-50 pb-20 dark:bg-black relative overflow-hidden pt-8 sm:pt-12">
+      {/* Dynamic Animated Background Elements */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <svg
+          className="absolute left-0 top-0 h-full w-full opacity-30 dark:opacity-20"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern
+              id="exams-grid"
+              width="60"
+              height="60"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M 60 0 L 0 0 0 60"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                className="text-zinc-200 dark:text-zinc-800"
+              />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#exams-grid)" />
+        </svg>
+
+        <motion.div
+           animate={{
+            scale: [1, 1.1, 1],
+            x: [0, 30, 0],
+            y: [0, -30, 0],
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-indigo-500/20 blur-[100px] dark:bg-indigo-600/20"
+        />
+        <motion.div
+           animate={{
+            scale: [1, 1.2, 1],
+            x: [0, -40, 0],
+            y: [0, 40, 0],
+          }}
+          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute top-1/2 right-0 h-100 w-100 -translate-y-1/2 translate-x-1/3 rounded-full bg-emerald-500/20 blur-[120px] dark:bg-emerald-600/20"
+        />
+        <motion.div
+           animate={{
+            scale: [1, 1.15, 1],
+            x: [0, 20, 0],
+            y: [0, 50, 0],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+          className="absolute -bottom-40 left-1/3 h-80 w-80 rounded-full bg-sky-500/20 blur-[100px] dark:bg-sky-600/20"
+        />
+      </div>
+
+      <div className="relative z-10 space-y-10 animate-fade-in-up pb-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-6">
         <div>
-          <h1 className="text-3xl font-bold font-heading text-foreground">Exam Library</h1>
+          <div className="flex items-center gap-3">
+             <Book3D className="w-8 h-8" isActive={true} />
+             <h1 className="text-3xl font-bold font-heading text-foreground">Exam Library</h1>
+          </div>
           <p className="text-muted-foreground mt-2">Challenge yourself with our curated assessments.</p>
         </div>
 
@@ -156,7 +217,9 @@ export default function ExamsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {attempted.slice(0, 4).map((exam: any) => (
-                      <ExamCard key={`attempted-${exam.id}`} {...exam} category={exam.type || exam.category || "General"} />
+                      <motion.div whileHover={{ y: -4 }} key={`attempted-motion-${exam.id}`}>
+                          <ExamCard key={`attempted-${exam.id}`} {...exam} category={exam.type || exam.category || "General"} />
+                      </motion.div>
                   ))}
               </div>
           </section>
@@ -174,7 +237,9 @@ export default function ExamsPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {examsList.map((exam: any) => (
-                        <ExamCard key={exam.id} {...exam} category={exam.type || exam.category || "General"} />
+                        <motion.div whileHover={{ y: -4 }} key={`motion-${exam.id}`}>
+                            <ExamCard key={exam.id} {...exam} category={exam.type || exam.category || "General"} />
+                        </motion.div>
                     ))}
                 </div>
             </section>
@@ -195,6 +260,7 @@ export default function ExamsPage() {
                </CardContent>
            </Card>
       )}
+      </div>
     </div>
   );
 }

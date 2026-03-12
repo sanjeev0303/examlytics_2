@@ -1,271 +1,130 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import React from 'react';
+import dynamic from 'next/dynamic';
+import { motion } from 'motion/react';
 import { useRouter } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
-import { useState, useEffect } from "react";
-import {
-  Target,
-  Trophy,
-  Clock,
-  ArrowRight,
-  Zap,
-  BookOpen,
-  TrendingUp,
-  Brain
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TrendIndicator } from "@/components/ui/trend-indicator";
-import { LearningHealthIndex } from "@/components/dashboard/learning-health-index";
-import { InsightCard } from "@/components/dashboard/insight-card";
-import { format } from "date-fns";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { AccuracyTrendChart } from "@/components/analytics/accuracy-trend-chart";
-import { FocusDecayChart } from "@/components/analytics/focus-decay-chart";
-import { TopicRadar } from "@/components/analytics/topic-radar";
+import { useUser } from "@/hooks/useAuth";
+import { Zap, Calendar, Loader2 } from 'lucide-react';
+import { Dashboard3D } from '@/components/ui/3d-icons';
 
-import { StreakWidget } from "@/components/dashboard/StreakWidget";
+// -- Lazy-load heavy chart & 3D components so the page shell paints instantly --
+const MetricsGrid = dynamic(
+  () => import('@/components/analytics/MetricsGrid').then(m => ({ default: m.MetricsGrid })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+const PerformanceTrend = dynamic(
+  () => import('@/components/analytics/PerformanceCharts').then(m => ({ default: m.PerformanceTrend })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+const SkillRadar = dynamic(
+  () => import('@/components/analytics/PerformanceCharts').then(m => ({ default: m.SkillRadar })),
+  { loading: () => <ChartSkeleton className="h-100" />, ssr: false }
+);
+const AIAnalystPanel = dynamic(
+  () => import('@/components/analytics/AIAnalystPanel').then(m => ({ default: m.AIAnalystPanel })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+const SplineHero = dynamic(
+  () => import('@/components/analytics/SplineHero').then(m => ({ default: m.SplineHero })),
+  { loading: () => <div className="w-full h-125 md:h-162.5 rounded-[2.5rem] bg-zinc-900/40 border border-white/10 animate-pulse flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>, ssr: false }
+);
+
+function ChartSkeleton({ className = "h-64" }: { className?: string }) {
+  return <div className={`w-full ${className} rounded-3xl bg-zinc-900/40 border border-white/5 animate-pulse`} />;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { getToken } = useAuth();
   const { user } = useUser();
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const { data: history } = useQuery({
-    queryKey: ["examHistory"],
-    queryFn: async () => {
-        const token = await getToken();
-        if (!token) throw new Error("Not authenticated");
-        return api.getExamHistory({
-            headers: { Authorization: `Bearer ${token}` }
-        });
-    },
-    enabled: !!user?.id,
-  });
-
-  const { data: streakData } = useQuery({
-    queryKey: ["streakData"],
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("Not authenticated");
-      return api.getStreaks({
-        headers: { Authorization: `Bearer ${token}` }
-      });
-    },
-    enabled: !!user?.id,
-  });
-
-
-  const { data: weakTopicsData } = useQuery({
-    queryKey: ["weakTopics"],
-    queryFn: async () => {
-        const token = await getToken();
-        if (!token) throw new Error("Not authenticated");
-        return api.getWeakTopics({
-            headers: { Authorization: `Bearer ${token}` }
-        });
-    },
-    enabled: !!user?.id,
-  });
-
-  // --- DATA PROCESSING ---
-  const exams = history || [];
-  const completedExams = exams.filter((e: any) => e.status === "COMPLETED");
-
-  // Calculate LHI (Mock calculation for now)
-  const avgAccuracy = completedExams.length
-    ? completedExams.reduce((acc: number, e: any) => acc + (e.accuracy || 0), 0) / completedExams.length
-    : 0;
-
-  const lhiScore = Math.round(avgAccuracy > 0 ? avgAccuracy : 72);
-  const displayWeakTopics = weakTopicsData || [];
-
-  // Mock Data for Charts (Real app would transform `history`)
-  const accuracyTrendData = [
-      { date: "Mon", score: 65, avg: 60 },
-      { date: "Tue", score: 68, avg: 61 },
-      { date: "Wed", score: 75, avg: 63 },
-      { date: "Thu", score: 72, avg: 64 },
-      { date: "Fri", score: 80, avg: 66 },
-      { date: "Sat", score: 78, avg: 67 },
-      { date: "Sun", score: 85, avg: 69 },
-  ];
-
-  const focusDecayData = [
-      { minute: 5, accuracy: 95, timePerQuestion: 45 },
-      { minute: 15, accuracy: 92, timePerQuestion: 50 },
-      { minute: 30, accuracy: 85, timePerQuestion: 55 },
-      { minute: 45, accuracy: 78, timePerQuestion: 70 }, // Fatigue sets in
-      { minute: 60, accuracy: 70, timePerQuestion: 90 },
-  ];
-
-  const radarData = [
-      { topic: "DSA", score: 80, benchmark: 90 },
-      { topic: "DBMS", score: 65, benchmark: 85 },
-      { topic: "CN", score: 70, benchmark: 80 },
-      { topic: "OS", score: 90, benchmark: 85 },
-      { topic: "OOP", score: 85, benchmark: 75 },
-      { topic: "Sys Design", score: 60, benchmark: 70 },
-  ];
-
-
-  // --- COMPONENTS ---
-
-  const HeaderSlot = (
-    <div className="flex flex-col gap-2 w-full">
-        <div className="flex items-center justify-between">
-            <div>
-                <h1 className="text-3xl font-bold font-heading text-text-primary tracking-tight">
-                    Dashboard
-                </h1>
-                <p className="text-text-secondary">
-                    Welcome back, {user?.firstName}. Here is your decision center.
-                </p>
-            </div>
-            <div className="hidden md:flex gap-3">
-                 <button className="px-4 py-2 text-sm font-medium text-text-primary bg-bg-surface border border-border-subtle rounded-lg hover:bg-bg-surface-raised transition-colors">
-                    View Reports
-                 </button>
-                 <button
-                    onClick={() => router.push("/exams/create")}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-accent-primary rounded-lg hover:opacity-90 transition-opacity shadow-sm"
-                 >
-                    Start Practice
-                 </button>
-            </div>
-        </div>
-    </div>
-  );
-
-  const StatsSlot = (
-    <>
-        {/* 1. Learning Health Index */}
-        <LearningHealthIndex score={lhiScore} trend={2.4} />
-
-        {/* 2. Insight Card */}
-        <div className="md:col-span-2">
-             <InsightCard
-                insight="You tend to rush questions in the first 10 minutes. Slowing down by 15% could improve your score by ~12 points."
-                actionLabel="Practice Pacing"
-                onAction={() => router.push("/exam?mode=pacing")}
-             />
-
-             {/* Replaced Grid with StreakWidget */}
-             <StreakWidget streakData={streakData} />
-        </div>
-
-        {/* 3. Priority Action */}
-        <Card variant="raised" className="bg-linear-to-br from-indigo-900 to-slate-900 text-white border-none relative overflow-hidden">
-             <div className="absolute top-0 right-0 -mt-10 -mr-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-             <CardContent className="h-full flex flex-col justify-between p-6 relative z-10">
-                <div className="space-y-2">
-                    <Badge variant="warning" className="bg-white/10 text-amber-300 border-none">Priority</Badge>
-                    <h3 className="text-lg font-semibold leading-tight">Review 'Dynamic Programming' Errors</h3>
-                    <p className="text-indigo-200 text-sm">5 pending errors from yesterday.</p>
-                </div>
-                <button
-                    onClick={() => router.push("/exam")}
-                    className="mt-4 w-full py-2 bg-white text-indigo-950 font-semibold text-sm rounded-lg hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
-                >
-                    Start Review <ArrowRight className="h-4 w-4" />
-                </button>
-             </CardContent>
-        </Card>
-    </>
-  );
-
-  const RecentActivitySlot = (
-    <Card className="h-full">
-        <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            {completedExams.slice(0, 5).map((exam: any, i: number) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-border-subtle last:border-0 hover:bg-bg-app/50 -mx-2 px-2 rounded-lg transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                        <div className="h-2 w-2 rounded-full bg-accent-primary" />
-                        <div>
-                            <p className="font-medium text-sm text-text-primary">{exam.title || "Quick Practice"}</p>
-                            <p className="text-xs text-text-secondary">{format(new Date(exam.startedAt), "MMM d, h:mm a")}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <span className="font-mono text-sm font-bold text-text-primary">{Math.round(exam.accuracy)}%</span>
-                    </div>
-                </div>
-            ))}
-            {completedExams.length === 0 && (
-                <div className="text-center py-8 text-text-muted text-sm">No recent activity.</div>
-            )}
-
-            <div className="pt-4 border-t border-border-subtle">
-                 <h4 className="text-sm font-medium text-text-secondary mb-4">Topic Proficiency</h4>
-                 {isMounted && <TopicRadar data={radarData} className="border-none shadow-none bg-transparent p-0" />}
-            </div>
-        </CardContent>
-    </Card>
-  );
 
   return (
-    <DashboardLayout
-        header={HeaderSlot}
-        stats={StatsSlot}
-        recentActivity={RecentActivitySlot}
-    >
-        {/* Main Content Area: Charts & Weak Topics */}
-        <div className="space-y-6">
+    <div className="min-h-screen bg-black text-white selection:bg-indigo-500/30 overflow-hidden relative">
+      {/* Background Mesh (From original advanced design) */}
+      <div className="fixed inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]"></div>
+      <div className="fixed left-0 right-0 top-0 -z-10 m-auto h-77.5 w-77.5 rounded-full bg-indigo-500 opacity-20 blur-[100px]"></div>
+      <div className="fixed right-0 bottom-0 -z-10 h-100 w-100 rounded-full bg-fuchsia-600 opacity-10 blur-[120px]"></div>
 
-            {/* Charts Section */}
-            {isMounted && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <AccuracyTrendChart data={accuracyTrendData} />
-                <FocusDecayChart data={focusDecayData} />
+      <div className="max-w-400 mx-auto p-4 md:p-8 relative z-10 space-y-8 h-full overflow-y-auto">
+
+        {/* Top Navbar Header */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4">
+             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-zinc-900 shadow-sm border border-zinc-800 text-indigo-400 transform transition-transform hover:scale-105 hover:rotate-3">
+                 <Dashboard3D className="w-8 h-8" isActive={true} />
+             </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl bg-clip-text bg-[linear-gradient(to_right,white,rgba(255,255,255,0.7))]">
+                  Dashboard
+              </h1>
+              <p className="mt-1 text-sm font-medium text-zinc-400">
+                  Welcome back, {user?.firstName || 'Learner'}. Here is your decision center.
+              </p>
             </div>
-            )}
+          </motion.div>
 
-            {/* Weak Topics ROI Grid */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <div>
-                        <CardTitle>Focus Areas (ROI)</CardTitle>
-                        <CardDescription>Topics with highest potential impact on your score</CardDescription>
-                    </div>
-                    <button className="text-sm text-accent-primary hover:underline" onClick={() => router.push("/weak-topics")}>
-                        View All
-                    </button>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                         {displayWeakTopics.length > 0 ? displayWeakTopics.slice(0, 3).map((topic: any, i: number) => (
-                            <div key={i} className="group p-4 rounded-xl border border-border-subtle hover:border-warning/50 hover:bg-warning/5 transition-all cursor-pointer">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-semibold text-text-primary">{topic.topicName}</h4>
-                                    <Badge variant="warning">{topic.accuracy}% Acc</Badge>
-                                </div>
-                                <div className="h-1.5 w-full bg-border-subtle rounded-full overflow-hidden mb-3">
-                                    <div className="h-full bg-warning transition-all" style={{ width: `${topic.accuracy}%` }} />
-                                </div>
-                                <p className="text-xs text-text-secondary">
-                                    Fixing this adds <strong className="text-text-primary">~{100 - topic.accuracy} pts</strong> potential.
-                                </p>
-                            </div>
-                         )) : (
-                            <div className="col-span-3 text-center py-12 text-text-muted">
-                                <Trophy className="mx-auto h-8 w-8 mb-2 opacity-20" />
-                                <p>Great job! No critical weak topics detected.</p>
-                            </div>
-                         )}
-                    </div>
-                </CardContent>
-            </Card>
+          <div className="flex items-center gap-3">
+             <button
+              onClick={() => router.push("/history")}
+              className="px-5 py-2.5 text-sm font-semibold text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-xl hover:text-white transition-all shadow-sm hover:bg-zinc-800"
+             >
+                 View Reports
+             </button>
+             <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => router.push("/exams/create")}
+                className="group relative px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 transition-all shadow-md overflow-hidden"
+             >
+                <span className="relative z-10 flex items-center gap-2">
+                    Start Practice <Zap className="w-4 h-4 text-indigo-200 group-hover:text-white transition-colors" />
+                </span>
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+             </motion.button>
+          </div>
+        </header>
+
+        {/* Hero 3D Visualization */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full mt-4"
+        >
+          <SplineHero />
+        </motion.div>
+
+        {/* 1. Learning Health & Core Metrics Grid */}
+        <div className="pt-2">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-lg font-semibold text-white">Core Analytics</h2>
+            <div className="h-px flex-1 bg-linear-to-r from-zinc-800 to-transparent ml-4"></div>
+          </div>
+          <MetricsGrid />
         </div>
-    </DashboardLayout>
+
+        {/* 2. Complex Visualizations Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2 pb-12">
+          <div className="lg:col-span-2 space-y-6">
+            <PerformanceTrend />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SkillRadar />
+              {/* ROI Focus Bubble replacement placeholder */}
+              <div className="p-6 md:p-8 rounded-3xl bg-zinc-900/40 backdrop-blur-xl border border-white/5 h-100 flex flex-col items-center justify-center">
+                 <div className="text-center p-6 border border-dashed border-zinc-800 rounded-2xl w-full h-full flex flex-col items-center justify-center bg-zinc-900/20">
+                    <Calendar className="w-10 h-10 text-zinc-600 mb-3" />
+                    <h3 className="text-zinc-300 font-medium">Focus Area ROI</h3>
+                    <p className="text-zinc-500 text-sm mt-2 max-w-50">Interactive Bubble chart loading module...</p>
+                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1">
+            <AIAnalystPanel />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

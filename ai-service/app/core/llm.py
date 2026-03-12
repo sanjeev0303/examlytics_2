@@ -9,6 +9,11 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from app.core.prompts import EXAM_ENGINE_SYSTEM_PROMPT, EVALUATION_SYSTEM_PROMPT
 
+# --- ENV VAR COMPATIBILITY ---
+# .env uses GEMINI_API_KEY but langchain-google-genai expects GOOGLE_API_KEY
+if os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
+
 # --- ENUMS & CONFIGURATION ---
 
 class LLMProvider(Enum):

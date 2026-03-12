@@ -2,129 +2,162 @@ package middleware
 
 import (
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/clerk/clerk-sdk-go/v2"
-	"github.com/clerk/clerk-sdk-go/v2/jwt"
 	"github.com/examlytics/server/internal/config"
-	"github.com/examlytics/server/internal/dto"
+	"github.com/examlytics/server/internal/domain"
 	"github.com/examlytics/server/internal/service"
-	"github.com/examlytics/server/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-// ClerkAuth is a middleware that validates Clerk JWT tokens
-type ClerkAuth struct {
-	secretKey   string
+const (
+	contextUserID = "userID"
+	contextRole   = "userRole"
+	contextEmail  = "userEmail"
+)
+
+// Claims defines the JWT payload structure
+type Claims struct {
+	UserID    string      `json:"uid"`
+	Email     string      `json:"email"`
+	Role      domain.Role `json:"role"`
+	FirstName string      `json:"first_name,omitempty"`
+	LastName  string      `json:"last_name,omitempty"`
+	ImageURL  string      `json:"image_url,omitempty"`
+	jwt.RegisteredClaims
+}
+
+// JWTAuth provides JWT-based auth middleware
+type JWTAuth struct {
+	cfg         *config.Config
 	userService service.UserService
 }
 
-// NewClerkAuth creates a new ClerkAuth middleware
-func NewClerkAuth(cfg *config.Config, userService service.UserService) *ClerkAuth {
-	// Configure Clerk Key globally (required by SDK)
-	if cfg.ClerkSecretKey != "" {
-		clerk.SetKey(cfg.ClerkSecretKey)
-	}
-	return &ClerkAuth{
-		secretKey:   cfg.ClerkSecretKey,
-		userService: userService,
-	}
+// NewJWTAuth creates a new JWTAuth middleware
+func NewJWTAuth(cfg *config.Config, userService service.UserService) *JWTAuth {
+	return &JWTAuth{cfg: cfg, userService: userService}
 }
 
-// Authenticate validates the Clerk JWT token and sets the user ID in context
-func (m *ClerkAuth) Authenticate() gin.HandlerFunc {
+// Authenticate parses the JWT if present. Does NOT block unauthenticated requests.
+func (j *JWTAuth) Authenticate() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.Next()
-			return
-		}
-
-		token := strings.TrimPrefix(authHeader, "Bearer ")
-
-		// LOAD TEST BYPASS: Only allow in development mode for load testing
-		// SECURITY: This bypass is DISABLED in production
-		if token == "LOAD_TEST_BYPASS_TOKEN" {
-			// Check if we're in development mode
-			env := os.Getenv("ENV")
-			if env == "development" || env == "dev" {
-				// Set a special clerk user ID that maps to our seeded user
-				c.Set("clerkUserID", "load_test_user_bypass")
-				logger.Warnf("⚠️  Load test bypass used - only allowed in development")
-				c.Next()
-				return
+		tokenStr := j.extractToken(c)
+		if tokenStr != "" {
+			if claims, err := j.parseToken(tokenStr, j.cfg.JWTSecret); err == nil {
+				c.Set(contextUserID, claims.UserID)
+				c.Set(contextRole, string(claims.Role))
+				c.Set(contextEmail, claims.Email)
 			}
-			// In production, treat as invalid token and continue to normal auth
-			logger.Errorf("🚨 SECURITY: Load test bypass attempted in production mode - BLOCKED")
-			c.AbortWithStatusJSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Invalid token"})
-			return
 		}
-
-		// Verify signature using Clerk SDK
-		// Note: Ideally use JWKS, but with Secret Key we can verify HS256 if configured,
-		// or use Decode with specific config.
-		// For this task, we assume generic decoding or simply checking claims if signature requires JWKS.
-		// Actually, clerk-sdk-go/v2/jwt.Decode automatically fetches JWKS if SecretKey is set in valid context/config
-		// or effectively validates sessions.
-
-		// Simpler approach for this environment: Verify using the Secret Key if it's a "standard" JWT library
-		// or just use the SDK's Decode which handles JWKS caching.
-		// Since we don't have the full Clerk API Setup in main.go, we will use a more manual generic verification
-		// OR better: trust the SDK.
-
-		claims, err := jwt.Verify(c.Request.Context(), &jwt.VerifyParams{
-			Token:  token,
-			Leeway: 10 * time.Second,
-		})
-		if err != nil {
-			logger.Errorf("JWT verification failed: %v", err)
-			c.Next()
-			return
-		}
-
-		c.Set("clerkUserID", claims.Subject)
 		c.Next()
 	}
 }
 
-// RequireLogin ensures the user is authenticated
-func (m *ClerkAuth) RequireLogin() gin.HandlerFunc {
+// RequireLogin aborts with 401 if no user is in context.
+func (j *JWTAuth) RequireLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, exists := c.Get("clerkUserID")
-		if !exists || userID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Unauthenticated"})
+		if _, ok := c.Get(contextUserID); !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
 			return
 		}
 		c.Next()
 	}
 }
 
-// RequireAdmin ensures the user has admin role by checking the DB
-func (m *ClerkAuth) RequireAdmin() gin.HandlerFunc {
+// RequireAdmin aborts with 403 if user does not hold ADMIN role.
+func (j *JWTAuth) RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, exists := c.Get("clerkUserID")
-		if !exists || userID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Unauthenticated"})
+		roleVal, ok := c.Get(contextRole)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
 			return
 		}
-
-		// Check Role in DB (Cached by Service/Repo ideally, but distinct query is safer than client header)
-		// casting userID to string is safe here
-		uid := userID.(string)
-
-		rolePtr, err := m.userService.GetUserRoleByClerkID(c.Request.Context(), uid)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Authorization check failed"})
+		if roleVal.(string) != string(domain.RoleAdmin) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin access required"})
 			return
 		}
-
-		if rolePtr == nil || *rolePtr != "ADMIN" {
-			c.AbortWithStatusJSON(http.StatusForbidden, dto.ErrorResponse{Error: "Admin access required"})
-			return
-		}
-
 		c.Next()
 	}
+}
+
+func (j *JWTAuth) extractToken(c *gin.Context) string {
+	auth := c.GetHeader("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer ")
+	}
+	if cookie, err := c.Cookie("accessToken"); err == nil {
+		return cookie
+	}
+	return ""
+}
+
+func (j *JWTAuth) parseToken(tokenStr, secret string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(secret), nil
+	}, jwt.WithExpirationRequired())
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, jwt.ErrTokenInvalidClaims
+	}
+	return claims, nil
+}
+
+// GenerateAccessToken creates a 15-min JWT signed with JWTSecret
+func (j *JWTAuth) GenerateAccessToken(user *domain.User) (string, error) {
+	firstName, lastName, imageURL := "", "", ""
+	if user.FirstName != nil {
+		firstName = *user.FirstName
+	}
+	if user.LastName != nil {
+		lastName = *user.LastName
+	}
+	if user.ImageURL != nil {
+		imageURL = *user.ImageURL
+	}
+	claims := &Claims{
+		UserID:    user.ID,
+		Email:     user.Email,
+		Role:      user.Role,
+		FirstName: firstName,
+		LastName:  lastName,
+		ImageURL:  imageURL,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   user.ID,
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+		},
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(j.cfg.JWTSecret))
+}
+
+// GenerateRefreshToken creates a 7-day JWT signed with JWTRefreshSecret
+func (j *JWTAuth) GenerateRefreshToken(user *domain.User) (string, error) {
+	claims := &Claims{
+		UserID: user.ID,
+		Email:  user.Email,
+		Role:   user.Role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   user.ID,
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+		},
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(j.cfg.JWTRefreshSecret))
+}
+
+// ParseRefreshToken validates and decodes a refresh token
+func (j *JWTAuth) ParseRefreshToken(tokenStr string) (string, error) {
+	claims, err := j.parseToken(tokenStr, j.cfg.JWTRefreshSecret)
+	if err != nil {
+		return "", err
+	}
+	return claims.UserID, nil
 }

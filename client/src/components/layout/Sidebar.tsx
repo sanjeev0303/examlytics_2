@@ -1,123 +1,205 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  BookOpen,
-  Target,
-  BarChart2,
-  History,
-  Settings,
+  Dashboard3D,
+  Activity3D,
+  Book3D,
+  Target3D,
+  History3D,
+  Settings3D
+} from "@/components/ui/3d-icons";
+import { NavLink } from "./NavItem";
+import {
   ChevronLeft,
   ChevronRight,
   LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { UserButton } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { motion, AnimatePresence } from "motion/react";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Exams", href: "/exams", icon: BookOpen },
-  { label: "Weak Topics", href: "/weak-topics", icon: Target },
-  { label: "Analytics", href: "/analytics", icon: BarChart2 },
-  { label: "History", href: "/history", icon: History },
-  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Dashboard", href: "/dashboard", icon: Dashboard3D },
+  { label: "Learning Analytics", href: "/learning-analytics", icon: Activity3D },
+  { label: "Exams", href: "/exams", icon: Book3D },
+  { label: "Weak Topics", href: "/weak-topics", icon: Target3D },
+  { label: "History", href: "/history", icon: History3D },
+  { label: "Settings", href: "/settings", icon: Settings3D },
 ];
 
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout, user, getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Prefetch data for a route when user hovers over the link.
+  // React Query's prefetchQuery is a no-op when data is already fresh,
+  // so this is safe to call on every hover.
+  const prefetchRoute = useCallback(async (href: string) => {
+    // Let Next.js prefetch the JS chunk for the page
+    router.prefetch(href);
+
+    if (!user?.id) return;
+    const token = await getToken();
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    switch (href) {
+      case "/dashboard":
+        queryClient.prefetchQuery({ queryKey: ["examHistory"], queryFn: () => api.getExamHistory({ headers }) });
+        queryClient.prefetchQuery({ queryKey: ["weakTopics"],  queryFn: () => api.getWeakTopics({ headers }) });
+        queryClient.prefetchQuery({ queryKey: ["streakData"],  queryFn: () => api.getStreaks({ headers }) });
+        break;
+      case "/history":
+        queryClient.prefetchQuery({ queryKey: ["examHistory"], queryFn: () => api.getExamHistory({ headers }) });
+        break;
+      case "/learning-analytics":
+        queryClient.prefetchQuery({ queryKey: ["readiness-score"], queryFn: () => api.getStreaks({ headers }) });
+        queryClient.prefetchQuery({ queryKey: ["streaks"],  queryFn: () => api.getStreaks({ headers }) });
+        queryClient.prefetchQuery({ queryKey: ["examHistory"], queryFn: () => api.getExamHistory({ headers }) });
+        break;
+      case "/analytics":
+        queryClient.prefetchQuery({ queryKey: ["examHistory"], queryFn: () => api.getExamHistory({ headers }) });
+        queryClient.prefetchQuery({ queryKey: ["streakData"],  queryFn: () => api.getStreaks({ headers }) });
+        break;
+      case "/weak-topics":
+        queryClient.prefetchQuery({ queryKey: ["weakTopics"], queryFn: () => api.getWeakTopics({ headers }) });
+        break;
+    }
+  }, [user?.id, getToken, queryClient, router]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const handleLogout = async () => {
+    await logout();
+    router.push("/");
+  };
+
   return (
     <aside
       className={cn(
-        "h-screen bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl border-r border-gray-200 dark:border-white/10 transition-all duration-300 ease-in-out relative flex flex-col z-50",
+        "h-screen bg-[#0F172A] backdrop-blur-3xl border-r border-[#22D3EE]/20 transition-all duration-300 ease-in-out relative flex flex-col z-50 overflow-hidden",
         isCollapsed ? "w-20" : "w-64"
       )}
     >
+      {/* Animated Background Mesh */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-50 dark:opacity-20">
+        <motion.div
+           animate={{
+            scale: [1, 1.2, 1],
+            y: [0, 20, 0],
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-20 -left-20 w-64 h-64 rounded-full bg-blue-500/20 blur-[80px]"
+        />
+        <motion.div
+           animate={{
+            scale: [1, 1.1, 1],
+            y: [0, -20, 0],
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          className="absolute bottom-10 -right-20 w-64 h-64 rounded-full bg-indigo-500/20 blur-[80px]"
+        />
+      </div>
+
       {/* Toggle Button */}
-      <button
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-8 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-white/10 rounded-full p-1 shadow-md hover:scale-110 transition-transform z-50 cursor-pointer"
+        className="absolute -right-3 top-8 bg-[#0F172A] border border-[#22D3EE]/30 rounded-full p-1 shadow-[0_0_15px_rgba(34,211,238,0.3)] z-50 cursor-pointer text-[#22D3EE]"
       >
         {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-      </button>
+      </motion.button>
 
       {/* Header */}
-      <div className={cn("h-16 flex items-center px-6 border-b border-gray-100 dark:border-white/5 mb-6", isCollapsed ? "justify-center px-0" : "justify-between")}>
-        <div className="flex items-center gap-2 overflow-hidden">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
-            <span className="text-white font-bold">E</span>
-          </div>
-          {!isCollapsed && (
-            <span className="font-heading font-bold text-lg text-gray-900 dark:text-white truncate">
-              Examlytics
-            </span>
-          )}
+      <div className={cn("h-16 flex items-center px-6 border-b border-[#22D3EE]/20 mb-6 relative z-10 bg-[#0F172A]", isCollapsed ? "justify-center px-0" : "justify-between")}>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <motion.div
+            whileHover={{ rotate: 180 }}
+            transition={{ duration: 0.4 }}
+            className="w-8 h-8 rounded-xl bg-linear-to-br from-[#22D3EE] to-[#818CF8] flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.4)]"
+          >
+            <span className="text-white font-bold font-heading">E</span>
+          </motion.div>
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.span
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="font-heading font-bold text-xl text-white truncate tracking-tight"
+              >
+                Examlytics
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 px-3 space-y-1.5 relative z-10 w-full mb-4">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <Link
+            <NavLink
               key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative",
-                isActive
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
-              )}
-            >
-              <item.icon size={20} className={cn("shrink-0 transition-colors", isActive && "text-blue-600 dark:text-blue-400")} />
-
-              {!isCollapsed && (
-                <span className="truncate">{item.label}</span>
-              )}
-
-              {/* Tooltip for collapsed state */}
-              {isCollapsed && (
-                <div className="absolute left-full ml-4 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  {item.label}
-                </div>
-              )}
-            </Link>
+              item={item}
+              isActive={isActive}
+              isCollapsed={isCollapsed}
+              prefetchRoute={prefetchRoute}
+            />
           );
         })}
       </nav>
 
       {/* User Section */}
-      <div className={cn("p-4 border-t border-gray-100 dark:border-white/5 mt-auto", isCollapsed && "flex justify-center")}>
-        <div className={cn("flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer w-full", isCollapsed && "justify-center p-0 hover:bg-transparent")}>
+      <div className={cn("p-4 border-t border-white/10 mt-auto relative z-10", isCollapsed && "flex justify-center")}>
+        <motion.div
+          onClick={handleLogout}
+          whileHover={{ y: -2 }}
+          className={cn("flex items-center gap-3 p-2 rounded-xl transition-all duration-300 w-full group overflow-hidden border border-transparent cursor-pointer",
+            !isCollapsed && "hover:border-red-500/30 hover:bg-red-500/10 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]",
+            isCollapsed && "justify-center p-0"
+          )}
+        >
           {mounted ? (
-            <UserButton
-              afterSignOutUrl="/"
-              appearance={{
-                elements: {
-                  avatarBox: "w-8 h-8"
-                }
-              }}
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
-          )}
-          {!isCollapsed && (
-            <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">Account</span>
-              <span className="text-xs text-gray-500 truncate dark:text-gray-500">Manage Profile</span>
+            <div className="relative w-9 h-9 shrink-0 rounded-full flex items-center justify-center bg-zinc-800/80 overflow-hidden shadow-inner group-hover:bg-red-500/20 group-hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all duration-300">
+              <LogOut size={16} className="text-zinc-400 group-hover:text-red-400 relative z-10 transition-colors" />
             </div>
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-zinc-800/80 animate-pulse shrink-0" />
           )}
-        </div>
+
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, x: -5, width: 0 }}
+                animate={{ opacity: 1, x: 0, width: "auto" }}
+                exit={{ opacity: 0, x: -5, width: 0 }}
+                className="flex flex-col truncate"
+              >
+                <span className="text-sm font-semibold text-zinc-200 group-hover:text-red-300 transition-colors truncate">
+                  {user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email : "Account"}
+                </span>
+                <span className="text-xs text-zinc-500 group-hover:text-red-400/80 transition-colors truncate">
+                  Sign out
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
     </aside>
   );

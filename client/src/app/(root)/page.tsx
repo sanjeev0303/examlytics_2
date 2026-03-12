@@ -1,86 +1,96 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
-import { useUser, useAuth } from "@clerk/nextjs";
-import { UserData } from "@/types";
-import { HeroSection } from "@/components/home/HeroSection";
 import Navbar from "@/components/home/navbar";
 import Footer from "@/components/home/Footer";
+import { LazySection } from "@/components/ui/LazySection";
+import { SectionSkeleton } from "@/components/ui/SectionSkeleton";
 
-const ProblemSolutionSection = dynamic(() => import("@/components/home/ProblemSolutionSection").then(mod => mod.ProblemSolutionSection));
-const ExamEngineSection = dynamic(() => import("@/components/home/ExamEngineSection").then(mod => mod.ExamEngineSection));
-const AnalyticsSection = dynamic(() => import("@/components/home/AnalyticsSection").then(mod => mod.AnalyticsSection));
-const WeakTopicSection = dynamic(() => import("@/components/home/WeakTopicSection").then(mod => mod.WeakTopicSection));
-const CodingPrepSection = dynamic(() => import("@/components/home/CodingPrepSection").then(mod => mod.CodingPrepSection));
-const MultiExamSection = dynamic(() => import("@/components/home/MultiExamSection").then(mod => mod.MultiExamSection));
-const HowItWorksSection = dynamic(() => import("@/components/home/HowItWorksSection").then(mod => mod.HowItWorksSection));
-const AdminSection = dynamic(() => import("@/components/home/AdminSection").then(mod => mod.AdminSection));
-const FinalCTASection = dynamic(() => import("@/components/home/FinalCTASection").then(mod => mod.FinalCTASection));
+const HeroSection = dynamic(
+  () => import("@/components/home/HeroSection").then(m => m.HeroSection),
+  { loading: () => (
+    <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-6 animate-pulse">
+      <div className="h-14 w-lg max-w-full rounded-xl bg-white/5" />
+      <div className="h-5 w-md max-w-full rounded-lg bg-white/4" />
+      <div className="flex gap-4 mt-6">
+        <div className="h-12 w-40 rounded-xl bg-indigo-500/20" />
+        <div className="h-12 w-36 rounded-xl bg-white/5" />
+      </div>
+    </div>
+  )}
+);
+
+const ProblemSolutionSection = dynamic(
+  () => import("@/components/home/ProblemSolutionSection").then(m => m.ProblemSolutionSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const ExamEngineSection = dynamic(
+  () => import("@/components/home/ExamEngineSection").then(m => m.ExamEngineSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const AnalyticsSection = dynamic(
+  () => import("@/components/home/AnalyticsSection").then(m => m.AnalyticsSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const WeakTopicSection = dynamic(
+  () => import("@/components/home/WeakTopicSection").then(m => m.WeakTopicSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const CodingPrepSection = dynamic(
+  () => import("@/components/home/CodingPrepSection").then(m => m.CodingPrepSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const MultiExamSection = dynamic(
+  () => import("@/components/home/MultiExamSection").then(m => m.MultiExamSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const HowItWorksSection = dynamic(
+  () => import("@/components/home/HowItWorksSection").then(m => m.HowItWorksSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const AdminSection = dynamic(
+  () => import("@/components/home/AdminSection").then(m => m.AdminSection),
+  { loading: () => <SectionSkeleton /> }
+);
+const FinalCTASection = dynamic(
+  () => import("@/components/home/FinalCTASection").then(m => m.FinalCTASection),
+  { loading: () => <SectionSkeleton /> }
+);
 
 export default function Home() {
-  const { user, isLoaded, isSignedIn } = useUser();
-  const { getToken } = useAuth();
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [syncing, setSyncing] = useState(false);
-
-  useEffect(() => {
-    const syncUser = async () => {
-      if (!isLoaded || !isSignedIn || !user) return;
-
-      setSyncing(true);
-      try {
-        const token = await getToken();
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-        // Sync user with backend
-        const response = await fetch(`${apiUrl}/auth/sync`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            "X-Clerk-User-ID": user.id,
-          },
-          body: JSON.stringify({
-            email: user.primaryEmailAddress?.emailAddress,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            imageUrl: user.imageUrl,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUserData(data);
-        }
-      } catch (error) {
-        console.error("Error syncing user:", error);
-      } finally {
-        setSyncing(false);
-      }
-    };
-
-    syncUser();
-  }, [user, isLoaded, isSignedIn, getToken]);
-
-
-
   return (
     <>
       <Navbar />
       <main className="bg-[#050511] min-h-screen text-white overflow-hidden selection:bg-brand-primary/30 relative">
         <HeroSection />
-      <ProblemSolutionSection />
-      <ExamEngineSection />
-      <AnalyticsSection />
-      <WeakTopicSection />
-      <CodingPrepSection />
-      <MultiExamSection />
-      <HowItWorksSection />
-      <AdminSection />
-      <FinalCTASection />
-      <Footer />
+        <LazySection minHeight="100vh">
+          <ProblemSolutionSection />
+        </LazySection>
+        <LazySection minHeight="100vh">
+          <ExamEngineSection />
+        </LazySection>
+        <LazySection minHeight="100vh">
+          <AnalyticsSection />
+        </LazySection>
+        <LazySection minHeight="100vh">
+          <WeakTopicSection />
+        </LazySection>
+        <LazySection minHeight="100vh">
+          <CodingPrepSection />
+        </LazySection>
+        <LazySection minHeight="100vh">
+          <MultiExamSection />
+        </LazySection>
+        <LazySection minHeight="100vh">
+          <HowItWorksSection />
+        </LazySection>
+        <LazySection minHeight="100vh">
+          <AdminSection />
+        </LazySection>
+        <LazySection minHeight="60vh">
+          <FinalCTASection />
+        </LazySection>
+        <Footer />
       </main>
     </>
   );

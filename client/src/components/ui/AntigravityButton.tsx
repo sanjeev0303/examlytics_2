@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { motion, HTMLMotionProps } from "framer-motion";
+import { motion } from "motion/react";
+import type { HTMLMotionProps } from "motion/react";
 import { cn } from "@/lib/utils";
 
 interface AntigravityButtonProps extends HTMLMotionProps<"button"> {

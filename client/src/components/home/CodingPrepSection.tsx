@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Terminal, Code, Cpu, MessageSquare } from "lucide-react";
 import { SectionWrapper } from "@/components/ui/SectionWrapper";
 import { AntigravityCard } from "@/components/ui/AntigravityCard";

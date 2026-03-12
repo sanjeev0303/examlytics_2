@@ -3,7 +3,7 @@
 import { useEffect, useState, memo, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,8 +68,7 @@ export default function ExamResultsPage() {
       if (!token) throw new Error("Not authenticated");
 
       const headers: Record<string, string> = {
-        Authorization: `Bearer ${token}`,
-        "X-Clerk-User-ID": user.id
+        Authorization: `Bearer ${token}`
       };
 
       return api.getExamSession(id, { headers });
@@ -199,7 +198,7 @@ export default function ExamResultsPage() {
                           <Target className="w-4 h-4 text-primary" /> Skill Profile
                       </CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[250px] flex items-center justify-center -ml-6">
+                  <CardContent className="h-62.5 flex items-center justify-center -ml-6">
                       <ResponsiveContainer width="100%" height="100%">
                           <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartData}>
                               <PolarGrid strokeOpacity={0.2} />

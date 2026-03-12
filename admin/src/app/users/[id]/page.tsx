@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/useAuth";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,6 @@ import {
 
 interface UserDetail {
     id: string;
-    clerkId: string;
     email: string;
     firstName: string;
     lastName: string;
@@ -139,7 +138,7 @@ export default function UserDetailPage() {
                                 <CardTitle>Topic Mastery Map</CardTitle>
                                 <CardDescription>AI's understanding of user strengths</CardDescription>
                             </CardHeader>
-                            <CardContent className="h-[300px]">
+                            <CardContent className="h-75">
                                 {masteryData.length > 0 ? (
                                     <ResponsiveContainer width="100%" height="100%">
                                         <RadarChart cx="50%" cy="50%" outerRadius="80%" data={masteryData}>
@@ -172,7 +171,7 @@ export default function UserDetailPage() {
                                 <CardDescription>JSON data stored in `user_ai_contexts`</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <pre className="bg-black/50 p-4 rounded-lg text-xs font-mono text-green-400 overflow-auto max-h-[300px]">
+                                <pre className="bg-black/50 p-4 rounded-lg text-xs font-mono text-green-400 overflow-auto max-h-75">
                                     {aiContext ? JSON.stringify(aiContext.contextData, null, 2) : "No context found"}
                                 </pre>
                             </CardContent>

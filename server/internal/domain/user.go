@@ -17,16 +17,16 @@ const (
 
 // User represents the user domain model
 type User struct {
-	ID         string          `json:"id" gorm:"type:uuid;primaryKey"`
-	ClerkID    string          `json:"clerkId" gorm:"column:clerk_id;uniqueIndex;not null"`
-	Email      string          `json:"email" gorm:"uniqueIndex;not null"`
-	FirstName  *string         `json:"firstName,omitempty" gorm:"column:first_name"`
-	LastName   *string         `json:"lastName,omitempty" gorm:"column:last_name"`
-	ImageURL   *string         `json:"imageUrl,omitempty" gorm:"column:image_url"`
-	Role       Role            `json:"role" gorm:"type:varchar(20);default:'USER'"`
-	CreatedAt  time.Time       `json:"createdAt" gorm:"column:created_at"`
-	UpdatedAt  time.Time       `json:"updatedAt" gorm:"column:updated_at"`
-	Preference *UserPreference `json:"preference,omitempty" gorm:"foreignKey:UserID"`
+	ID           string          `json:"id" gorm:"type:uuid;primaryKey"`
+	Email        string          `json:"email" gorm:"uniqueIndex;not null"`
+	PasswordHash string          `json:"-" gorm:"column:password_hash;not null"`
+	FirstName    *string         `json:"firstName,omitempty" gorm:"column:first_name"`
+	LastName     *string         `json:"lastName,omitempty" gorm:"column:last_name"`
+	ImageURL     *string         `json:"imageUrl,omitempty" gorm:"column:image_url"`
+	Role         Role            `json:"role" gorm:"type:varchar(20);default:'USER'"`
+	CreatedAt    time.Time       `json:"createdAt" gorm:"column:created_at"`
+	UpdatedAt    time.Time       `json:"updatedAt" gorm:"column:updated_at"`
+	Preference   *UserPreference `json:"preference,omitempty" gorm:"foreignKey:UserID"`
 }
 
 // TableName specifies the table name for GORM

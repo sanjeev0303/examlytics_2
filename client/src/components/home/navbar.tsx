@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useUser, UserButton } from "@clerk/nextjs"
+import { useUser } from "@/hooks/useAuth"
 import Link from "next/link"
+import UserButton from "@/components/ui/UserButton"
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -57,13 +58,24 @@ export default function Navbar() {
         {/* CTA Button */}
         {/* CTA Button & User Profile */}
         <div className="flex items-center gap-4">
-          <Link
-            href={isSignedIn ? "/dashboard" : "/sign-in"}
-            className="bg-primary text-white border-white/20 border px-6 py-2.5 rounded-full font-medium hover:opacity-90 text-sm transition-all duration-200 shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 btn-smooth"
-          >
-            {isSignedIn ? "Dashboard" : "Get Started"}
-          </Link>
-          {isSignedIn && <UserButton afterSignOutUrl="/" />}
+          {isSignedIn ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
+              >
+                Dashboard
+              </Link>
+              <UserButton />
+            </>
+          ) : (
+            <Link
+              href="/sign-in"
+              className="bg-primary text-white border-white/20 border px-6 py-2.5 rounded-full font-medium hover:opacity-90 text-sm transition-all duration-200 shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 btn-smooth"
+            >
+              Get Started
+            </Link>
+          )}
         </div>
       </div>
     </nav>

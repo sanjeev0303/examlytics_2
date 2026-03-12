@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { SectionWrapper } from "@/components/ui/SectionWrapper";
 import { AntigravityCard } from "@/components/ui/AntigravityCard";
@@ -50,7 +50,7 @@ export const WeakTopicSection = () => {
               {/* Timeline */}
               <div className="relative border-l border-white/10 ml-4 space-y-8 pb-4">
                  <div className="relative pl-8">
-                    <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white/20" />
+                    <div className="absolute -left-1.25 top-1 w-2.5 h-2.5 rounded-full bg-white/20" />
                     <p className="text-xs text-white/40 mb-1">Today</p>
                     <div className="bg-brand-dark p-3 rounded-lg border border-white/5">
                        <p className="text-sm">Diagnostic Failed (45% acc)</p>
@@ -58,7 +58,7 @@ export const WeakTopicSection = () => {
                  </div>
 
                  <div className="relative pl-8">
-                    <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-brand-primary" />
+                    <div className="absolute -left-1.25 top-1 w-2.5 h-2.5 rounded-full bg-brand-primary" />
                     <p className="text-xs text-white/40 mb-1">Recommended Action</p>
                      <div className="bg-brand-primary/10 p-3 rounded-lg border border-brand-primary/20 flex justify-between items-center group cursor-pointer hover:bg-brand-primary/20 transition-colors">
                         <div>
@@ -75,7 +75,7 @@ export const WeakTopicSection = () => {
                  </div>
 
                  <div className="relative pl-8 opacity-50">
-                    <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white/10" />
+                    <div className="absolute -left-1.25 top-1 w-2.5 h-2.5 rounded-full bg-white/10" />
                     <p className="text-xs text-white/40 mb-1">Projected • +5 Days</p>
                     <div className="bg-brand-dark p-3 rounded-lg border border-dashed border-white/10">
                        <p className="text-sm">Mastery Achieved (+15 Marks)</p>

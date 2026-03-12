@@ -41,7 +41,7 @@ export function StatCard({
                                 <Info className="h-3 w-3 text-muted-foreground/50 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p className="max-w-[200px] text-xs">{tooltipText}</p>
+                                <p className="max-w-50 text-xs">{tooltipText}</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -12,7 +12,7 @@ import {
   LogOut,
   AlertCircle
 } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/useAuth";
 
 const routes = [
   {
@@ -98,9 +98,25 @@ export const Sidebar = ({ className }: { className?: string }) => {
       </div>
       <div className="px-3 py-2 border-t border-gray-800">
           <div className="flex items-center p-3 w-full justify-start font-medium text-zinc-400">
-             <UserButton afterSignOutUrl="/sign-in" showName/>
+             <AdminLogoutButton />
           </div>
       </div>
     </div>
   );
 };
+
+function AdminLogoutButton() {
+  const { logout, user } = useAuth();
+  const router = useRouter();
+  const handleLogout = async () => {
+    await logout();
+    router.push("/sign-in");
+  };
+  return (
+    <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors">
+      <LogOut className="h-4 w-4" />
+      <span className="truncate">{user?.firstName || user?.email || "Admin"}</span>
+      <span className="text-xs text-zinc-600 ml-auto">Sign out</span>
+    </button>
+  );
+}

@@ -42,15 +42,17 @@ export function RadialChart({ score, total, title = "Accuracy", description = "C
   const endAngle = (percentage / 100) * 360
 
   return (
-    <Card className="flex flex-col border-0 shadow-sm">
-      <CardHeader className="items-center pb-0">
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex-1 pb-0">
+    <div className="flex flex-col">
+      {(title || description) && (
+        <CardHeader className="items-center pb-0">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+      )}
+      <CardContent className="flex-1 pb-0 px-0">
         <ChartContainer
           config={chartConfig}
-          className="mx-auto aspect-square max-h-[250px]"
+          className="mx-auto aspect-square max-h-56"
         >
           <RadialBarChart
             data={chartData}
@@ -63,10 +65,10 @@ export function RadialChart({ score, total, title = "Accuracy", description = "C
               gridType="circle"
               radialLines={false}
               stroke="none"
-              className="first:fill-muted last:fill-background"
+              className="first:fill-muted last:fill-transparent"
               polarRadius={[86, 74]}
             />
-            <RadialBar dataKey="score" background cornerRadius={10} />
+            <RadialBar dataKey="score" background={{ fill: "transparent" }} cornerRadius={10} />
             <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
               <Label
                 content={({ viewBox }) => {
@@ -81,16 +83,16 @@ export function RadialChart({ score, total, title = "Accuracy", description = "C
                         <tspan
                           x={viewBox.cx}
                           y={viewBox.cy}
-                          className="fill-foreground text-4xl font-bold"
+                          className="fill-foreground text-4xl font-black tracking-tight"
                         >
                           {Math.round(percentage)}%
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 24}
-                          className="fill-muted-foreground text-sm"
+                          className="fill-muted-foreground text-[10px] font-bold uppercase tracking-widest"
                         >
-                          Score
+                          Accuracy
                         </tspan>
                       </text>
                     )
@@ -102,12 +104,12 @@ export function RadialChart({ score, total, title = "Accuracy", description = "C
         </ChartContainer>
       </CardContent>
       {footerText && (
-        <CardFooter className="flex-col gap-2 text-sm">
-            <div className="leading-none text-muted-foreground">
+        <CardFooter className="flex-col gap-2 text-sm pt-2">
+            <div className="leading-none text-muted-foreground text-center">
             {footerText}
             </div>
         </CardFooter>
       )}
-    </Card>
+    </div>
   )
 }

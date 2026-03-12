@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function UsersPage() {
   const { getToken } = useAuth();

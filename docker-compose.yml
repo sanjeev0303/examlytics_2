@@ -6,9 +6,18 @@ services:
       - "8001:8001"
     volumes:
       - ./ai-service:/app
+    env_file:
+      - ./ai-service/.env
     environment:
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
       - REDIS_URL=redis://redis:6379/0
+      # Enable the exam worker automatically in development
+      - EXAM_WORKER_ENABLED=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
     # Override the default CMD to enable hot reloading
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
@@ -21,6 +30,7 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -35,9 +45,18 @@ services:
     volumes:
       - ./server:/app
       - go-modules:/go/pkg/mod
+    env_file:
+      - ./server/.env
     environment:
       - CGO_ENABLED=0
+      # Override to use the local Redis container instead of external Upstash
       - REDIS_URL=redis://redis:6379/0
+      # Override to use the Docker service name instead of localhost
+      - AI_SERVICE_URL=http://ai-service:8001
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
     # Install air for hot reloading and run it
     command: sh -c "go install github.com/air-verse/air@v1.61.1 && air"
 
@@ -48,10 +67,31 @@ services:
       - "3000:3000"
     volumes:
       - ./client:/app
-      - /app/node_modules
+      - client_node_modules:/app/node_modules
+      - client_next:/app/.next
+    environment:
+      - NEXT_TELEMETRY_DISABLED=1
+      - NODE_OPTIONS=--max-old-space-size=4096
+      # Inside Docker, browser-side fetches still use localhost:8000 (host-mapped port).
+      # For any server-side Next.js fetch (SSR/Route Handlers), use the internal service name.
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - API_URL=http://server-go:8000
+      - NODE_ENV=development
+    depends_on:
+      - server-go
+    restart: unless-stopped
+    healthcheck:
+      # Lightweight TCP check — don't trigger page compilation on health probes
+      test: ["CMD", "node", "-e", "const s=require('net').createConnection(3000,'localhost');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     # Ensure dependencies are installed and run dev server
     command: sh -c "npm install && npm run dev"
 
 volumes:
   go-modules:
   redis_data:
+  client_node_modules:
+  client_next:

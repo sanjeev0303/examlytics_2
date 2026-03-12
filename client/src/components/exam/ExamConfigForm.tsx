@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,9 +46,6 @@ export function ExamConfigForm({ initialType = "JOB", initialTopic = "" }: ExamC
        const headers: Record<string, string> = {
          Authorization: `Bearer ${token}`
        };
-       if (user?.id) {
-         headers["X-Clerk-User-ID"] = user.id;
-       }
        const session = await api.startExam(config, { headers });
        router.push(`/exam/${session.jobId}`);
      } catch (error) {

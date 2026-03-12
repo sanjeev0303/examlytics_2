@@ -101,10 +101,53 @@ func (r *PostgresExamRepository) FindExamSessionByID(ctx context.Context, id str
 }
 
 // UpdateExamSession updates an exam session
+// Uses a column map instead of Save() to handle nil JSONB fields correctly.
+// GORM's Save() serializes nil []byte as ” which PostgreSQL JSONB rejects.
 func (r *PostgresExamRepository) UpdateExamSession(session *domain.ExamSession) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return r.db.WithContext(ctx).Save(session).Error
+
+	updates := map[string]interface{}{
+		"user_id":         session.UserID,
+		"exam_id":         session.ExamID,
+		"type":            session.Type,
+		"topic_id":        session.TopicID,
+		"total_questions": session.TotalQuestions,
+		"score":           session.Score,
+		"accuracy":        session.Accuracy,
+		"time_taken":      session.TimeTaken,
+		"status":          session.Status,
+		"started_at":      session.StartedAt,
+		"completed_at":    session.CompletedAt,
+		"recommendation":  session.Recommendation,
+		"cache_hash":      session.CacheHash,
+		"job_error":       session.JobError,
+		"updated_at":      session.UpdatedAt,
+	}
+
+	// JSONB fields: use gorm.Expr("NULL") for empty slices to avoid '' → invalid JSON
+	if len(session.Questions) > 0 {
+		updates["questions"] = gorm.Expr("?::jsonb", string(session.Questions))
+	} else {
+		updates["questions"] = gorm.Expr("NULL")
+	}
+	if len(session.UserResponses) > 0 {
+		updates["user_responses"] = gorm.Expr("?::jsonb", string(session.UserResponses))
+	} else {
+		updates["user_responses"] = gorm.Expr("NULL")
+	}
+	if len(session.WeakTopics) > 0 {
+		updates["weak_topics"] = gorm.Expr("?::jsonb", string(session.WeakTopics))
+	} else {
+		updates["weak_topics"] = gorm.Expr("NULL")
+	}
+	if len(session.CachedAnalysis) > 0 {
+		updates["cached_analysis"] = gorm.Expr("?::jsonb", string(session.CachedAnalysis))
+	} else {
+		updates["cached_analysis"] = gorm.Expr("NULL")
+	}
+
+	return r.db.WithContext(ctx).Model(&domain.ExamSession{}).Where("id = ?", session.ID).Updates(updates).Error
 }
 
 // SaveSessionAnswers saves answers for a session

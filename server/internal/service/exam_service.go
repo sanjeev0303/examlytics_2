@@ -21,14 +21,15 @@ import (
 type ExamService interface {
 	GetExams(ctx context.Context, userID string) ([]*domain.Exam, error)
 	GetTopics(ctx context.Context) ([]*domain.Topic, error)
-	StartExam(ctx context.Context, clerkID string, req dto.StartExamRequest) (*dto.ExamGenerationStatus, error)
-	GenerateExamSync(ctx context.Context, clerkID string, req dto.StartExamRequest) (*domain.ExamSession, error)
+	StartExam(ctx context.Context, userID string, req dto.StartExamRequest) (*dto.ExamGenerationStatus, error)
+	GenerateExamSync(ctx context.Context, userID string, req dto.StartExamRequest) (*domain.ExamSession, error)
 	GetExamGenerationStatus(ctx context.Context, jobID string) (*dto.ExamGenerationStatus, error)
 	GetExamSession(ctx context.Context, sessionID string) (*dto.ExamSessionResponse, error)
-	SubmitExam(ctx context.Context, clerkID string, req dto.SubmitExamRequest) (*dto.ExamGenerationStatus, error)
-	SubmitExamSync(ctx context.Context, clerkID string, req dto.SubmitExamRequest) (*dto.ExamResultResponse, error)
-	GetUserExamHistory(ctx context.Context, clerkID string) ([]*dto.ExamSessionResponse, error)
-	GetWeakTopics(ctx context.Context, clerkID string) ([]*dto.WeakTopicSummary, error)
+	GetStreamingQuestions(ctx context.Context, sessionID string) (*dto.StreamingQuestionsResponse, error)
+	SubmitExam(ctx context.Context, userID string, req dto.SubmitExamRequest) (*dto.ExamGenerationStatus, error)
+	SubmitExamSync(ctx context.Context, userID string, req dto.SubmitExamRequest) (*dto.ExamResultResponse, error)
+	GetUserExamHistory(ctx context.Context, userID string) ([]*dto.ExamSessionResponse, error)
+	GetWeakTopics(ctx context.Context, userID string) ([]*dto.WeakTopicSummary, error)
 }
 
 // Internal struct to match AI Service JSON Schema (snake_case and camelCase fallback)
@@ -94,7 +95,7 @@ func (s *ExamServiceImpl) GetExams(ctx context.Context, userID string) ([]*domai
 	// 1. If UserID is provided, fetch attended types
 	if userID != "" {
 		// Resolve Clerk ID to Internal ID
-		user, err := s.userRepo.FindByClerkID(ctx, userID)
+		user, err := s.userRepo.FindByID(ctx, userID)
 		if err == nil && user != nil {
 			attendedTypes, err = s.examRepo.GetAttendedExamTypes(ctx, user.ID)
 			if err != nil {
@@ -293,10 +294,19 @@ func (s *ExamServiceImpl) GetExamSession(ctx context.Context, sessionID string) 
 		}
 	}
 
+	// Resolve TopicName from TopicID
+	topicNameMap := make(map[string]string)
+	allTopics, _ := s.examRepo.FindAllTopics(ctx)
+	for _, t := range allTopics {
+		topicNameMap[t.ID] = t.Name
+	}
+	topicName := s.resolveTopicName(session.TopicID, session.Type, topicNameMap)
+
 	resp := &dto.ExamSessionResponse{
 		SessionID:      session.ID,
 		Type:           session.Type,
 		TopicID:        session.TopicID,
+		TopicName:      topicName,
 		TotalQuestions: session.TotalQuestions,
 		Status:         string(session.Status),
 		Questions:      questions,
@@ -322,8 +332,8 @@ func (s *ExamServiceImpl) GetExamSession(ctx context.Context, sessionID string) 
 }
 
 // StartExam initiates async exam generation
-func (s *ExamServiceImpl) StartExam(ctx context.Context, clerkID string, req dto.StartExamRequest) (*dto.ExamGenerationStatus, error) {
-	user, err := s.userRepo.FindByClerkID(ctx, clerkID)
+func (s *ExamServiceImpl) StartExam(ctx context.Context, userID string, req dto.StartExamRequest) (*dto.ExamGenerationStatus, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +376,7 @@ func (s *ExamServiceImpl) StartExam(ctx context.Context, clerkID string, req dto
 
 	job := map[string]interface{}{
 		"job_id":      session.ID,
-		"user_id":     clerkID,     // Changed from clerkId
+		"user_id":     userID,      // Changed from clerkId
 		"preferences": preferences, // Changed from request
 		"source":      source,
 		"created_at":  time.Now().Unix(),
@@ -421,9 +431,96 @@ func (s *ExamServiceImpl) GetExamGenerationStatus(ctx context.Context, jobID str
 	return &status, nil
 }
 
+// GetStreamingQuestions returns questions available so far from the Redis stream buffer
+func (s *ExamServiceImpl) GetStreamingQuestions(ctx context.Context, sessionID string) (*dto.StreamingQuestionsResponse, error) {
+	if s.redisClient == nil {
+		return nil, errors.New("redis unavailable")
+	}
+
+	streamKey := "stream:" + sessionID
+	totalKey := streamKey + ":total"
+
+	// Get total expected from Redis
+	totalStr, err := s.redisClient.Get(ctx, totalKey)
+	totalExpected := 0
+	if err == nil {
+		fmt.Sscanf(totalStr, "%d", &totalExpected)
+	}
+
+	// Get all questions currently in the stream
+	items, err := s.redisClient.LRange(ctx, streamKey, 0, -1)
+	if err != nil {
+		items = []string{}
+	}
+
+	var questions []dto.QuestionDTO
+	for _, item := range items {
+		var q dto.QuestionDTO
+		if err := json.Unmarshal([]byte(item), &q); err == nil {
+			// Hide sensitive fields for live exams
+			q.CorrectAnswer = ""
+			q.Explanation = ""
+			questions = append(questions, q)
+		}
+	}
+
+	loadedCount := len(questions)
+	isComplete := loadedCount > 0 && loadedCount >= totalExpected
+
+	// Determine status
+	status := "STREAMING"
+	if isComplete {
+		status = "READY"
+	} else if loadedCount == 0 {
+		// Check job status for PENDING/PROCESSING/FAILED
+		jobVal, jobErr := s.redisClient.Get(ctx, "job:"+sessionID)
+		if jobErr == nil {
+			var jobStatus dto.ExamGenerationStatus
+			if json.Unmarshal([]byte(jobVal), &jobStatus) == nil {
+				if jobStatus.Status == dto.JobStatusFailed {
+					status = "FAILED"
+				} else {
+					status = jobStatus.Status
+				}
+			}
+		} else {
+			status = "PENDING"
+		}
+	}
+
+	// Get session metadata for type/topicName
+	session, _ := s.examRepo.FindExamSessionByID(ctx, sessionID)
+	examType := ""
+	topicName := ""
+	if session != nil {
+		examType = session.Type
+		topicNameMap := make(map[string]string)
+		allTopics, _ := s.examRepo.FindAllTopics(ctx)
+		for _, t := range allTopics {
+			topicNameMap[t.ID] = t.Name
+		}
+		topicName = s.resolveTopicName(session.TopicID, session.Type, topicNameMap)
+		if totalExpected == 0 {
+			totalExpected = session.TotalQuestions
+		}
+	}
+
+	return &dto.StreamingQuestionsResponse{
+		Questions:     questions,
+		TotalExpected: totalExpected,
+		LoadedCount:   loadedCount,
+		IsComplete:    isComplete,
+		Status:        status,
+		Duration:      600,
+		SessionID:     sessionID,
+		Type:          examType,
+		TopicName:     topicName,
+	}, nil
+}
+
 // GenerateExamSync contains the core logic for generating an exam (now called by worker)
-func (s *ExamServiceImpl) GenerateExamSync(ctx context.Context, clerkID string, req dto.StartExamRequest) (*domain.ExamSession, error) {
-	user, err := s.userRepo.FindByClerkID(ctx, clerkID)
+func (s *ExamServiceImpl) GenerateExamSync(ctx context.Context, userID string, req dto.StartExamRequest) (*domain.ExamSession, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -431,8 +528,7 @@ func (s *ExamServiceImpl) GenerateExamSync(ctx context.Context, clerkID string, 
 		return nil, errors.New("user not found")
 	}
 
-	userID := user.ID
-
+	// userID is already the correct internal user ID from the caller
 	// 1. Generate Blueprint via AI
 	blueprintReq := ai.BlueprintRequest{
 		WeakTopicIDs: []string{}, // Retrieve from user profile/stats if implemented
@@ -543,7 +639,7 @@ func (s *ExamServiceImpl) GenerateExamSync(ctx context.Context, clerkID string, 
 }
 
 // SubmitExam initiates async exam submission
-func (s *ExamServiceImpl) SubmitExam(ctx context.Context, clerkID string, req dto.SubmitExamRequest) (*dto.ExamGenerationStatus, error) {
+func (s *ExamServiceImpl) SubmitExam(ctx context.Context, userID string, req dto.SubmitExamRequest) (*dto.ExamGenerationStatus, error) {
 	// 1. Validate Basic constraints
 	// (Optional: can do basic checks here like session existence, but let worker handle it for speed)
 
@@ -551,7 +647,7 @@ func (s *ExamServiceImpl) SubmitExam(ctx context.Context, clerkID string, req dt
 	jobID := uuid.New().String()
 	job := dto.ExamSubmissionJob{
 		JobID:     jobID,
-		ClerkID:   clerkID,
+		UserID:    userID,
 		Request:   req,
 		CreatedAt: time.Now(),
 	}
@@ -580,8 +676,8 @@ func (s *ExamServiceImpl) SubmitExam(ctx context.Context, clerkID string, req dt
 }
 
 // SubmitExamSync calculates score and updates session (Worker calls this)
-func (s *ExamServiceImpl) SubmitExamSync(ctx context.Context, clerkID string, req dto.SubmitExamRequest) (*dto.ExamResultResponse, error) {
-	user, err := s.userRepo.FindByClerkID(ctx, clerkID)
+func (s *ExamServiceImpl) SubmitExamSync(ctx context.Context, userID string, req dto.SubmitExamRequest) (*dto.ExamResultResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -626,6 +722,15 @@ func (s *ExamServiceImpl) SubmitExamSync(ctx context.Context, clerkID string, re
 
 	var evaluatedResponses []EvaluatedUserResponse
 	weaknessMap := make(map[string]float64) // FIX 4: Weak Topic Map
+
+	// Per-topic performance tracking for accurate weak topic stats
+	type topicPerf struct {
+		correct       int
+		total         int
+		weaknessScore float64
+		resolvedName  string // best-effort topic name
+	}
+	topicPerfMap := make(map[string]*topicPerf)
 
 	logger.Info(fmt.Sprintf("📝 Processing submission for session %s with %d answers", req.SessionID, len(req.Answers)))
 	for i, ans := range req.Answers {
@@ -690,12 +795,22 @@ func (s *ExamServiceImpl) SubmitExamSync(ctx context.Context, clerkID string, re
 		}
 
 		// FIX 4: Weak Topic Calculation (Accumulate)
-		if confidence < 0.85 {
+		{
 			targetTopic := topicID
 			if targetTopic == "" {
 				targetTopic = "Uncategorized"
 			}
-			weaknessMap[targetTopic] += (1.0 - confidence)
+			if _, ok := topicPerfMap[targetTopic]; !ok {
+				topicPerfMap[targetTopic] = &topicPerf{}
+			}
+			tp := topicPerfMap[targetTopic]
+			tp.total++
+			if confidence >= 0.85 {
+				tp.correct++
+			} else {
+				tp.weaknessScore += (1.0 - confidence)
+				weaknessMap[targetTopic] += (1.0 - confidence)
+			}
 		}
 
 		logger.Info(fmt.Sprintf("🔍 Q%d (%s): User Ans='%s' => Score=%.2f, Conf=%.2f",
@@ -806,36 +921,52 @@ func (s *ExamServiceImpl) SubmitExamSync(ctx context.Context, clerkID string, re
 				severity = "HIGH"
 			}
 
+			// Resolve topic name using multiple strategies
 			tName := topicNames[topic]
 			finalTopicID := topic
 
-			if tName == "" || topic == "Uncategorized" {
-				// Fallback: Use Session Topic if available
-				// We need to resolve session.TopicID to a name if we haven't already
-				// For efficiency, we can iterate all topics once at start of function or here (topics are few)
-				// Let's assume we want to use session.TopicID as the Weak Topic ID so improvements target the main topic
-				if session.TopicID != "" {
-					finalTopicID = session.TopicID
-					// Try to resolve name
-					allTopics, _ := s.examRepo.FindAllTopics(ctx)
-					for _, t := range allTopics {
-						if t.ID == session.TopicID {
-							tName = t.Name
-							break
-						}
-					}
-					if tName == "" {
-						tName = "General Improvement"
-					}
-				} else {
-					tName = "General Improvement"
+			// Strategy 1: topicNames map already resolved it (from DB or JSONB text)
+			// Strategy 2: Use resolveTopicName helper (handles UUID → name, text passthrough, type fallback)
+			if tName == "" {
+				allTopics, _ := s.examRepo.FindAllTopics(ctx)
+				tmpMap := make(map[string]string)
+				for _, t := range allTopics {
+					tmpMap[t.ID] = t.Name
 				}
+				tName = s.resolveTopicName(topic, session.Type, tmpMap)
+			}
+
+			// Strategy 3: If still "Uncategorized" or generic, use session-level topic
+			if tName == "" || tName == "Uncategorized" || tName == "Assessment" {
+				if session.TopicID != "" {
+					allTopics, _ := s.examRepo.FindAllTopics(ctx)
+					tmpMap := make(map[string]string)
+					for _, t := range allTopics {
+						tmpMap[t.ID] = t.Name
+					}
+					resolved := s.resolveTopicName(session.TopicID, session.Type, tmpMap)
+					if resolved != "" {
+						tName = resolved
+						finalTopicID = session.TopicID
+					}
+				}
+			}
+
+			// Final fallback: use exam type label
+			if tName == "" {
+				tName = s.resolveTopicName("", session.Type, nil)
+			}
+
+			// Calculate per-topic accuracy from tracked performance
+			topicAccuracy := 0.0
+			if perf, ok := topicPerfMap[topic]; ok && perf.total > 0 {
+				topicAccuracy = (float64(perf.correct) / float64(perf.total)) * 100.0
 			}
 
 			finalWeakTopics = append(finalWeakTopics, dto.WeakTopic{
 				TopicID:   finalTopicID,
 				TopicName: tName,
-				Accuracy:  0, // Placeholder
+				Accuracy:  topicAccuracy,
 				Severity:  severity,
 			})
 		}
@@ -987,13 +1118,51 @@ func (s *ExamServiceImpl) SubmitExamSync(ctx context.Context, clerkID string, re
 			}
 		}
 
-		// Persist analysis to session
+		// Persist analysis to session — MERGE weak topics instead of overwriting
 		sess, err := s.examRepo.FindExamSessionByID(ctx, sessionID)
 		if err == nil && sess != nil {
 			sess.Recommendation = recommendation
-			if wtBytes, err := json.Marshal(weakTopics); err == nil {
-				sess.WeakTopics = wtBytes
+
+			// Merge: keep existing local weak topics, enrich with AI data
+			var existingWT []dto.WeakTopic
+			if len(sess.WeakTopics) > 0 {
+				_ = json.Unmarshal(sess.WeakTopics, &existingWT)
 			}
+
+			if len(existingWT) > 0 {
+				// We already have locally-computed weak topics with real accuracy.
+				// Only add AI-discovered topics that have a real topicID and aren't duplicates.
+				existingMap := make(map[string]*dto.WeakTopic)
+				for i := range existingWT {
+					existingMap[existingWT[i].TopicID] = &existingWT[i]
+				}
+				for _, aiWT := range weakTopics {
+					if aiWT.TopicID == "" {
+						continue // Skip AI topics without a real topic ID
+					}
+					if _, exists := existingMap[aiWT.TopicID]; !exists {
+						existingWT = append(existingWT, aiWT)
+					}
+				}
+				if wtBytes, err := json.Marshal(existingWT); err == nil {
+					sess.WeakTopics = wtBytes
+				}
+			} else if len(weakTopics) > 0 {
+				// No local weak topics — use AI's (filter out empty topicIDs)
+				var filtered []dto.WeakTopic
+				for _, aiWT := range weakTopics {
+					if aiWT.TopicID != "" || aiWT.TopicName != "" {
+						filtered = append(filtered, aiWT)
+					}
+				}
+				if len(filtered) > 0 {
+					if wtBytes, err := json.Marshal(filtered); err == nil {
+						sess.WeakTopics = wtBytes
+					}
+				}
+			}
+			// If both are empty, don't touch WeakTopics at all
+
 			_ = s.examRepo.UpdateExamSession(sess)
 		}
 	}(session.ID, session.UserID, session.Type, session.Accuracy, aiReq, sessionAnswers, aiResults, topicNames)
@@ -1165,8 +1334,8 @@ func (s *ExamServiceImpl) SubmitExamSync(ctx context.Context, clerkID string, re
 	}, nil
 }
 
-func (s *ExamServiceImpl) GetUserExamHistory(ctx context.Context, clerkID string) ([]*dto.ExamSessionResponse, error) {
-	user, err := s.userRepo.FindByClerkID(ctx, clerkID)
+func (s *ExamServiceImpl) GetUserExamHistory(ctx context.Context, userID string) ([]*dto.ExamSessionResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -1179,25 +1348,61 @@ func (s *ExamServiceImpl) GetUserExamHistory(ctx context.Context, clerkID string
 		return nil, err
 	}
 
+	// Build a topic UUID→Name lookup map for resolving TopicID
+	topicNameMap := make(map[string]string)
+	allTopics, _ := s.examRepo.FindAllTopics(ctx)
+	for _, t := range allTopics {
+		topicNameMap[t.ID] = t.Name
+	}
+
 	var dtos []*dto.ExamSessionResponse
 	for _, sess := range sessions {
-		dtos = append(dtos, &dto.ExamSessionResponse{
-			SessionID:      sess.ID,
-			Type:           sess.Type,
-			TopicID:        sess.TopicID,
-			TotalQuestions: sess.TotalQuestions,
-			Status:         string(sess.Status),
-			StartedAt:      sess.StartedAt,
-			CompletedAt:    sess.CompletedAt,
-			Score:          sess.Score,
-			TimeTaken:      sess.TimeTaken,
-		})
+		topicName := s.resolveTopicName(sess.TopicID, sess.Type, topicNameMap)
+
+		resp := &dto.ExamSessionResponse{
+			SessionID:                 sess.ID,
+			Type:                      sess.Type,
+			TopicID:                   sess.TopicID,
+			TopicName:                 topicName,
+			TotalQuestions:            sess.TotalQuestions,
+			Status:                    string(sess.Status),
+			StartedAt:                 sess.StartedAt,
+			CompletedAt:               sess.CompletedAt,
+			Score:                     sess.Score,
+			Accuracy:                  sess.Accuracy,
+			TimeTaken:                 sess.TimeTaken,
+			ImprovementRecommendation: sess.Recommendation,
+		}
+
+		// Populate WeakTopics from JSONB
+		if len(sess.WeakTopics) > 0 {
+			var wts []dto.WeakTopic
+			if err := json.Unmarshal(sess.WeakTopics, &wts); err == nil {
+				resp.WeakTopics = wts
+			}
+		}
+
+		// Compute CorrectCount from UserResponses JSONB
+		if len(sess.UserResponses) > 0 && sess.Status == domain.SessionCompleted {
+			var evalResps []EvaluatedUserResponse
+			if err := json.Unmarshal(sess.UserResponses, &evalResps); err == nil {
+				cc := 0
+				for _, er := range evalResps {
+					if er.IsCorrect {
+						cc++
+					}
+				}
+				resp.CorrectCount = cc
+			}
+		}
+
+		dtos = append(dtos, resp)
 	}
 	return dtos, nil
 }
 
-func (s *ExamServiceImpl) GetWeakTopics(ctx context.Context, clerkID string) ([]*dto.WeakTopicSummary, error) {
-	user, err := s.userRepo.FindByClerkID(ctx, clerkID)
+func (s *ExamServiceImpl) GetWeakTopics(ctx context.Context, userID string) ([]*dto.WeakTopicSummary, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -1341,4 +1546,41 @@ func (s *ExamServiceImpl) updateTopicAggregates(ctx context.Context, userID stri
 		_ = s.examRepo.UpsertUserTopicAggregate(ctx, agg)
 	}
 	return nil
+}
+
+// resolveTopicName converts a session's TopicID into a human-readable name.
+// TopicID may be a UUID (looked up in topicNameMap), a plain name like
+// "Frontend Developer", or empty. The method also considers the exam Type
+// (e.g. "JEE", "CODING") to build a meaningful display title.
+func (s *ExamServiceImpl) resolveTopicName(topicID, examType string, topicNameMap map[string]string) string {
+	// 1. If topicID is a UUID, resolve from the map
+	if name, ok := topicNameMap[topicID]; ok && name != "" {
+		return name
+	}
+
+	// 2. If topicID is already a human-readable string, use it directly.
+	// Skip generic/sentinel values so they fall through to the type-label lookup.
+	genericSentinels := map[string]bool{
+		"general": true, "General": true, "GENERAL": true,
+		"default": true, "Default": true, "DEFAULT": true,
+		"none": true, "None": true, "NONE": true,
+		"n/a": true, "N/A": true,
+	}
+	if topicID != "" && !genericSentinels[topicID] {
+		return topicID
+	}
+
+	// 3. Fall back to exam type
+	typeLabels := map[string]string{
+		"JOB":         "Job Preparation",
+		"JEE":         "JEE Practice",
+		"CODING":      "Coding Challenge",
+		"CUSTOM":      "Custom Assessment",
+		"IMPROVEMENT": "Improvement Exam",
+	}
+	if label, ok := typeLabels[examType]; ok {
+		return label
+	}
+
+	return "Assessment"
 }

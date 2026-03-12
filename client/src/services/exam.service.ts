@@ -32,6 +32,9 @@ export const ExamService = {
   getSession: (sessionId: string, options?: RequestInit) =>
     ApiClient.fetchWithAuth(`/exams/session/${sessionId}`, options),
 
+  getStreamingQuestions: (sessionId: string, options?: RequestInit) =>
+    ApiClient.fetchWithAuth(`/exams/session/${sessionId}/stream`, options),
+
   getHistory: (options?: RequestInit) => ApiClient.fetchWithAuth("/exams/history", options),
 
   getExamStatus: (jobId: string, options?: RequestInit) =>

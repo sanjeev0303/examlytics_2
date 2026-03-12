@@ -94,7 +94,7 @@ func (r *Router) Setup() *gin.Engine {
 	submitLimiter := middleware.NewRateLimiter(60*1000, 30)   // 30 req/min for submissions per IP
 	waf := middleware.NewWAF()
 	piiDetector := middleware.NewPIIDetector()
-	clerkAuth := middleware.NewClerkAuth(r.cfg, userService)
+	jwtAuth := middleware.NewJWTAuth(r.cfg, userService)
 	requestLogger := middleware.NewRequestLogger()
 
 	// Timeout config
@@ -113,7 +113,7 @@ func (r *Router) Setup() *gin.Engine {
 		"https://examlytics-client.vercel.app",
 	}
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
-	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Clerk-User-ID"}
+	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	corsConfig.AllowCredentials = true
 	r.engine.Use(cors.New(corsConfig))
 
@@ -137,18 +137,18 @@ func (r *Router) Setup() *gin.Engine {
 
 	// 5. Now apply expensive middleware only for admitted requests
 	dbGuard := middleware.NewDatabaseGuard(r.db)
-	r.engine.Use(dbGuard.Protect())        // Fail fast if DB full
-	r.engine.Use(clerkAuth.Authenticate()) // DB lookup for user
-	r.engine.Use(globalLimiter.Limit())    // Now uses sharded locks
+	r.engine.Use(dbGuard.Protect())      // Fail fast if DB full
+	r.engine.Use(jwtAuth.Authenticate()) // Parse + validate JWT
+	r.engine.Use(globalLimiter.Limit())  // Now uses sharded locks
 	r.engine.Use(botDetector.Detect())
 	r.engine.Use(waf.Protect())
 	r.engine.Use(piiDetector.Detect())
 
 	// Initialize handlers
 	userHandler := handler.NewUserHandler(userService)
-	authHandler := handler.NewAuthHandler(userService)
+	authHandler := handler.NewAuthHandler(userService, jwtAuth)
 	examHandler := handler.NewExamHandler(examService)
-	analyticsHandler := handler.NewAnalyticsHandler(analyticsService, userRepo)
+	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
 	// Metrics
 	metricsHandler := handler.NewMetricsHandler(handler.MetricsConfig{
@@ -157,11 +157,11 @@ func (r *Router) Setup() *gin.Engine {
 	})
 
 	// Register routes with admission control and timeouts
-	r.registerUserRoutes(userHandler, requestTimeout)
-	r.registerAuthRoutes(authHandler, clerkAuth, authLimiter, requestTimeout)
-	r.registerExamRoutes(examHandler, clerkAuth, submitLimiter, requestTimeout)
-	r.registerAdminRoutes(userHandler)
-	r.registerAnalyticsRoutes(analyticsHandler, clerkAuth, requestTimeout)
+	r.registerUserRoutes(userHandler, jwtAuth, requestTimeout)
+	r.registerAuthRoutes(authHandler, jwtAuth, authLimiter, requestTimeout)
+	r.registerExamRoutes(examHandler, jwtAuth, submitLimiter, requestTimeout)
+	r.registerAdminRoutes(userHandler, jwtAuth)
+	r.registerAnalyticsRoutes(analyticsHandler, jwtAuth, requestTimeout)
 
 	// Metrics & Health
 	r.engine.GET("/metrics", metricsHandler.Metrics)
@@ -174,31 +174,34 @@ func (r *Router) registerHealthRoutes(h *handler.HealthHandler) {
 	r.engine.GET("/health/detailed", h.ReadinessCheck)
 }
 
-func (r *Router) registerUserRoutes(h *handler.UserHandler, timeout time.Duration) {
+func (r *Router) registerUserRoutes(h *handler.UserHandler, auth *middleware.JWTAuth, timeout time.Duration) {
 	users := r.engine.Group("/users")
 	users.Use(middleware.PropagateDeadline(timeout))
 	{
-		users.POST("", h.CreateUser)
-		users.GET("", h.GetUsers)
-		users.POST("/onboarding", h.OnboardUser)
-		users.PUT("/preferences", h.OnboardUser) // Alias for updates
-		users.GET("/weak-topics", h.GetWeakTopics)
+		users.GET("", auth.RequireAdmin(), h.GetUsers)
+		users.POST("/onboarding", auth.RequireLogin(), h.OnboardUser)
+		users.PUT("/preferences", auth.RequireLogin(), h.OnboardUser) // Alias for updates
+		users.PUT("/profile", auth.RequireLogin(), h.UpdateProfile)
+		users.GET("/weak-topics", auth.RequireLogin(), h.GetWeakTopics)
 	}
 }
 
-func (r *Router) registerAuthRoutes(h *handler.AuthHandler, auth *middleware.ClerkAuth, limiter *middleware.RateLimiter, timeout time.Duration) {
+func (r *Router) registerAuthRoutes(h *handler.AuthHandler, auth *middleware.JWTAuth, limiter *middleware.RateLimiter, timeout time.Duration) {
 	authGroup := r.engine.Group("/auth")
 	authGroup.Use(r.admissionCtrl.Limit("light")) // Light class: 2000 concurrent
 	authGroup.Use(limiter.Limit())
 	authGroup.Use(middleware.PropagateDeadline(timeout))
 	{
-		authGroup.POST("/sync", h.SyncUser)
+		authGroup.POST("/register", h.Register)
+		authGroup.POST("/login", h.Login)
+		authGroup.POST("/refresh", h.Refresh)
+		authGroup.POST("/logout", h.Logout)
 		authGroup.GET("/me", auth.RequireLogin(), h.GetMe)
 		authGroup.GET("/role", auth.RequireLogin(), h.GetRole)
 	}
 }
 
-func (r *Router) registerExamRoutes(h *handler.ExamHandler, auth *middleware.ClerkAuth, submitLimiter *middleware.RateLimiter, timeout time.Duration) {
+func (r *Router) registerExamRoutes(h *handler.ExamHandler, auth *middleware.JWTAuth, submitLimiter *middleware.RateLimiter, timeout time.Duration) {
 	// Public routes - medium class (1000 concurrent) for DB protection
 	r.engine.GET("/exams",
 		r.admissionCtrl.Limit("medium"),
@@ -224,6 +227,11 @@ func (r *Router) registerExamRoutes(h *handler.ExamHandler, auth *middleware.Cle
 			r.admissionCtrl.Limit("medium"),
 			middleware.PropagateDeadline(timeout),
 			h.GetExamSession,
+		)
+		examsAuth.GET("/session/:id/stream",
+			r.admissionCtrl.Limit("medium"),
+			middleware.PropagateDeadline(timeout),
+			h.GetStreamingQuestions,
 		)
 		examsAuth.GET("/status/:jobId",
 			r.admissionCtrl.Limit("medium"),
@@ -256,8 +264,9 @@ func (r *Router) registerExamRoutes(h *handler.ExamHandler, auth *middleware.Cle
 	}
 }
 
-func (r *Router) registerAdminRoutes(h *handler.UserHandler) {
+func (r *Router) registerAdminRoutes(h *handler.UserHandler, auth *middleware.JWTAuth) {
 	admin := r.engine.Group("/admin")
+	admin.Use(auth.RequireAdmin())
 	admin.Use(r.admissionCtrl.Limit("medium")) // Admin tools are medium priority
 	admin.Use(middleware.PropagateDeadline(10 * time.Second))
 	{
@@ -266,7 +275,7 @@ func (r *Router) registerAdminRoutes(h *handler.UserHandler) {
 	}
 }
 
-func (r *Router) registerAnalyticsRoutes(h *handler.AnalyticsHandler, auth *middleware.ClerkAuth, timeout time.Duration) {
+func (r *Router) registerAnalyticsRoutes(h *handler.AnalyticsHandler, auth *middleware.JWTAuth, timeout time.Duration) {
 	analytics := r.engine.Group("/analytics")
 	analytics.Use(auth.RequireLogin())
 	analytics.Use(r.admissionCtrl.Limit("medium")) // Medium class: 1000 concurrent

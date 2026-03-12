@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useUser, UserButton } from "@clerk/nextjs"
+import { useUser } from "@/hooks/useAuth"
 import Link from "next/link"
 
 const navLinks = [
@@ -63,7 +63,14 @@ export default function Navbar() {
           >
             {isSignedIn ? "Dashboard" : "Get Started"}
           </Link>
-          {isSignedIn && <UserButton afterSignOutUrl="/" />}
+          {isSignedIn && (
+            <Link
+              href="/dashboard"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Dashboard →
+            </Link>
+          )}
         </div>
       </div>
     </nav>

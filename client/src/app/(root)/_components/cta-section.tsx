@@ -1,6 +1,6 @@
 "use client"
 
-import { useUser } from "@clerk/nextjs"
+import { useUser } from "@/hooks/useAuth"
 import Link from "next/link"
 
 export default function CtaSection() {

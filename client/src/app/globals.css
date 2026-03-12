@@ -52,6 +52,21 @@
   --color-muted: var(--bg-surface-raised);
   --color-muted-foreground: var(--text-muted);
 
+  /* shadcn required tokens */
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
   /* Theme from frontend_test */
    --color-brand-deep: #0a0a1f;
   --color-brand-dark: #12122b;
@@ -75,6 +90,21 @@
 
     --background: #050511;
   --foreground: #ffffff;
+
+  /* shadcn component tokens (Light) */
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
+  --input: #E5E7EB;
+  --border: #E5E7EB;
+  --ring: #4F46E5;
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
 
   /* LIGHT MODE TOKENS */
   --bg-app: #F9FAFB; /* Gray 50 */
@@ -125,6 +155,21 @@
 
   --accent-primary: #F8FAFC; /* Slate 50 (Inverted) */
   --accent-secondary: #27272A; /* Zinc 800 */
+
+  /* shadcn component tokens (Dark) */
+  --popover: #151921;
+  --popover-foreground: #F9FAFB;
+  --accent: #1F2937;
+  --accent-foreground: #F9FAFB;
+  --input: #374151;
+  --border: #1F2937;
+  --ring: #6366F1;
+  --card: #151921;
+  --card-foreground: #F9FAFB;
+  --secondary: #27272A;
+  --secondary-foreground: #F9FAFB;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
 
   --success: #10B981; /* Emerald 500 */
   --success-foreground: #FFFFFF;

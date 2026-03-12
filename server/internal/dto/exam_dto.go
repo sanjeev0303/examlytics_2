@@ -17,8 +17,8 @@ type StartExamRequest struct {
 
 type AnswerSubmission struct {
 	QuestionID string `json:"questionId" binding:"required"`
-	Answer     string `json:"answer" binding:"required"`
-	TimeSpent  int    `json:"timeSpent" binding:"required"` // In seconds
+	Answer     string `json:"answer"`    // May be empty for skipped questions
+	TimeSpent  int    `json:"timeSpent"` // In seconds
 }
 
 type SubmitExamRequest struct {
@@ -70,6 +70,7 @@ type ExamSessionResponse struct {
 	SessionID                 string        `json:"sessionId"`
 	Type                      string        `json:"type,omitempty"`
 	TopicID                   string        `json:"topicId,omitempty"`
+	TopicName                 string        `json:"topicName,omitempty"`
 	TotalQuestions            int           `json:"totalQuestions"`
 	Status                    string        `json:"status"`
 	Questions                 []QuestionDTO `json:"questions"`
@@ -86,14 +87,14 @@ type ExamSessionResponse struct {
 
 type ExamGenerationJob struct {
 	JobID     string           `json:"jobId"`
-	ClerkID   string           `json:"clerkId"`
+	UserID    string           `json:"userId"`
 	Request   StartExamRequest `json:"request"`
 	CreatedAt time.Time        `json:"createdAt"`
 }
 
 type ExamSubmissionJob struct {
 	JobID     string            `json:"jobId"`
-	ClerkID   string            `json:"clerkId"`
+	UserID    string            `json:"userId"`
 	Request   SubmitExamRequest `json:"request"`
 	CreatedAt time.Time         `json:"createdAt"`
 }
@@ -109,5 +110,20 @@ const (
 	JobStatusPending    = "PENDING"
 	JobStatusProcessing = "PROCESSING"
 	JobStatusCompleted  = "COMPLETED"
+	JobStatusReady      = "READY"
+	JobStatusStreaming  = "STREAMING"
 	JobStatusFailed     = "FAILED"
 )
+
+// StreamingQuestionsResponse is returned by the streaming questions endpoint
+type StreamingQuestionsResponse struct {
+	Questions     []QuestionDTO `json:"questions"`
+	TotalExpected int           `json:"totalExpected"`
+	LoadedCount   int           `json:"loadedCount"`
+	IsComplete    bool          `json:"isComplete"`
+	Status        string        `json:"status"`
+	Duration      int           `json:"duration"`
+	SessionID     string        `json:"sessionId"`
+	Type          string        `json:"type,omitempty"`
+	TopicName     string        `json:"topicName,omitempty"`
+}

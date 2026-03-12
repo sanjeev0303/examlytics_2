@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@/hooks/useAuth";
 
 export function ExamGenerationLoader({ sessionId }: { sessionId: string }) {
   const router = useRouter();
@@ -25,9 +25,6 @@ export function ExamGenerationLoader({ sessionId }: { sessionId: string }) {
         const headers: Record<string, string> = {
           Authorization: `Bearer ${token}`
         };
-        if (user?.id) {
-            headers["X-Clerk-User-ID"] = user.id;
-        }
 
         const session = await api.getExamSession(sessionId, { headers });
 
